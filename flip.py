@@ -34,13 +34,24 @@ class Flipper:
                     self.g(self.bh), self.g(self.wave)))
 
     def flip(self):
-        if args.remove_common_flips:
-            flips = [1, 0] if np.random.binomial(1, 0.5, 1) else [0, 1]
+        if True:
+            mu = 0.0
+            sigma = 0.015
+            dt = 1.0 / 252
+
+            drift = mu * dt
+            for i, price in enumerate(self.prices):
+                shock = sigma * np.random.normal(0, 1) * np.sqrt(dt)
+                p = price + price * (drift + shock)
+                self.prices[i] = p
         else:
-            flips = np.random.binomial(1, 0.5, args.num_stocks)
-        self.prices = [
-                val * (1.0 + self.delta) if flip else val / (1.0 + self.delta)
-                for flip, val in zip(flips, self.prices)]
+            if args.remove_common_flips:
+                flips = [1, 0] if np.random.binomial(1, 0.5, 1) else [0, 1]
+            else:
+                flips = np.random.binomial(1, 0.5, args.num_stocks)
+            self.prices = [
+                    val * (1.0 + self.delta) if flip else val / (1.0 + self.delta)
+                    for flip, val in zip(flips, self.prices)]
 
     def total_value(self, positions):
         return sum([w * v for w, v in zip(positions, self.prices)])
@@ -118,14 +129,13 @@ if __name__ == '__main__':
         bh_results = []
         wave_results = []
         print(args)
-        print(args.iterations)
         trials = 100
         for i in range(trials):
             flipper = Flipper(args.delta, args.threshold, 0)
             flipper.simulate(args.iterations)
             bh_results.append(flipper.g(flipper.bh))
             wave_results.append(flipper.g(flipper.wave))
-            print('progress: {} / {} -- {}(min: {}, max:{}, recent: {}), {}\n'.format(i, trials, np.mean(bh_results), min(bh_results), max(bh_results), bh_results[-1], np.mean(wave_results)), end='')
+            print('progress: {} / {} -- {}(min: {}, max: {}, recent: {}), {}\n'.format(i, trials, np.mean(bh_results), min(bh_results), max(bh_results), bh_results[-1], np.mean(wave_results)), end='')
             sys.stdout.flush()
         print()
         print(np.mean(bh_results), np.mean(wave_results))
