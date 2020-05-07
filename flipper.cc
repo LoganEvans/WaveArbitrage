@@ -25,7 +25,8 @@ public:
     }
     num_rand_bits_ = c;
     next_rand_index_ = c;
-    generator_.seed(std::chrono::high_resolution_clock().now().time_since_epoch().count());
+    generator_.seed(
+        std::chrono::high_resolution_clock().now().time_since_epoch().count());
   }
 
   virtual ~Flipper() {}
@@ -75,12 +76,12 @@ protected:
   virtual void rebalance() {}
 
   bool next_rand() {
-    bool val = false;
     if (next_rand_index_ >= num_rand_bits_) {
       rand_value_ = rand();
       next_rand_index_ = 0;
     }
 
+    bool val = false;
     if (rand_value_ & (1 << next_rand_index_)) {
       val = true;
     }
@@ -90,7 +91,7 @@ protected:
   }
 
   void adjust_prices() {
-    if (false) {
+    if (true) {
       if (next_rand()) {
         prices_[0] *= delta_;
         prices_[1] /= delta_;
@@ -103,7 +104,8 @@ protected:
       static constexpr double sqrt_dt = 0.062994078834; // (1.0 / 252) ** 0.5
 
       for (int i = 0; i < 2; i++) {
-        prices_[i] = prices_[i] + prices_[i] * (sigma * sqrt_dt * norm_dist_(generator_));
+        prices_[i] = prices_[i] +
+                     prices_[i] * (sigma * sqrt_dt * norm_dist_(generator_));
       }
     }
   }
@@ -154,7 +156,7 @@ protected:
 };
 
 void run_experiment(int flips, int num_bh_trials, int num_wave_trials) {
-  const auto num_cpus= std::thread::hardware_concurrency();
+  const auto num_cpus = std::thread::hardware_concurrency();
   const int kBatchSize = 1;
 
   std::mutex mu;
@@ -262,7 +264,7 @@ void run_experiment(int flips, int num_bh_trials, int num_wave_trials) {
     total_wave_trials += wave_trials[i];
   }
 
-  printf("%d,%lf,%lf,%lf,%lf\n", flips, bh_g_acc / total_bh_trials,
+  printf("%d,%.10lf,%.10lf,%.10lf,%.10lf\n", flips, bh_g_acc / total_bh_trials,
          bh_val_acc / total_bh_trials, wave_g_acc / total_wave_trials,
          wave_val_acc / total_wave_trials);
 }
@@ -272,8 +274,8 @@ int main() {
   setbuf(stdout, NULL);
 
   printf("flips,bh_g,bh_val,wave_g,wave_val\n");
-  //for (int i = 1; i < 1000000000; i = i + 1 + i * 0.1) {
+  // for (int i = 1; i < 1000000000; i = i + 1 + i * 0.1) {
   //  run_experiment(i, 16000, 4000);
   //}
-  run_experiment(10000, 10000, 10000);
+  run_experiment(/*flips=*/10000000, /*num_bh_trials=*/1, /*num_wave_trials=*/10000);
 }

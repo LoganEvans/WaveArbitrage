@@ -1,22 +1,22 @@
 import argparse
 import sys
 import collections
+import math
 import numpy as np
+import random
+import scipy.stats
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--delta', type=float, default=0.001)
 parser.add_argument('--threshold', type=float, default=0.005)
-parser.add_argument('--interval', type=int, default=10000)
 parser.add_argument('--iterations', type=int, default=1000000)
 parser.add_argument('--num_stocks', type=int, default=2)
-parser.add_argument('--print_interval_status', type=bool, default=False)
 parser.add_argument('--remove_common_flips', type=bool, default=False)
 
 class Flipper:
-    def __init__(self, delta, threshold, interval):
+    def __init__(self, delta, threshold):
         self.delta = delta
         self.threshold = threshold
-        self.interval = interval
         self.prices = [1.0 for _ in range(args.num_stocks)]
         self.bh = [1.0 for _ in range(args.num_stocks)]
         self.wave = [1.0 for _ in range(args.num_stocks)]
@@ -34,7 +34,7 @@ class Flipper:
                     self.g(self.bh), self.g(self.wave)))
 
     def flip(self):
-        if True:
+        if False:
             mu = 0.0
             sigma = 0.015
             dt = 1.0 / 252
@@ -46,12 +46,38 @@ class Flipper:
                 self.prices[i] = p
         else:
             if args.remove_common_flips:
-                flips = [1, 0] if np.random.binomial(1, 0.5, 1) else [0, 1]
+                #flips = [1, 0] if np.random.binomial(1, 0.5) else [0, 1]
+                flips = [1, 0] if random.randint(0, 1) else [0, 1]
             else:
+                assert(False)
                 flips = np.random.binomial(1, 0.5, args.num_stocks)
             self.prices = [
                     val * (1.0 + self.delta) if flip else val / (1.0 + self.delta)
                     for flip, val in zip(flips, self.prices)]
+
+    def flip_direction(self, up: bool):
+        if up:
+            flips = [1, 0]
+        else:
+            flips = [0, 1]
+
+        self.prices = [
+                val * (1.0 + self.delta) if flip else val / (1.0 + self.delta)
+                for flip, val in zip(flips, self.prices)]
+
+    def excess(self):
+        return int(np.round(math.log(self.prices[0], 1.0 + self.delta)))
+
+    def successes(self, n_flips):
+        return n_flips // 2 + self.excess() // 2
+
+    def probability_density(self, n_flips):
+        return scipy.stats.binom(n_flips, 0.5).pmf(self.successes(n_flips))
+
+    def weighted_value(self, n_flips):
+        value = self.g(self.bh)
+        weight = self.probability_density(n_flips)
+        return value * weight
 
     def total_value(self, positions):
         return sum([w * v for w, v in zip(positions, self.prices)])
@@ -67,76 +93,63 @@ class Flipper:
         self.wave = [total / args.num_stocks / val for val in self.prices]
 
     def simulate(self, samples):
-        bh_values = collections.deque()
-        wave_values = collections.deque()
-
-        delta = None
         for i in range(samples):
             self.flip()
-            frac = self.total_value(self.wave) / args.num_stocks
-            vals = [price * size for price, size in zip(self.prices, self.wave)]
+            #frac = self.total_value(self.wave) / args.num_stocks
+            #vals = [price * size for price, size in zip(self.prices, self.wave)]
 
-            if max(vals) / frac - 1.0 > self.threshold:
-                self.rebalance()
-
-            #if i % 100000 == 0:
-            #    print(i, flipper, file=sys.stderr)
-
-            if args.print_interval_status:
-                total_bh = self.total_value(self.bh)
-                total_wave = self.total_value(self.wave)
-
-                bh_values.append(total_bh)
-                wave_values.append(total_wave)
-
-                if len(bh_values) > self.interval:
-                    bh_val = bh_values.popleft()
-                    wave_val = wave_values.popleft()
-
-                    bh = bh_values[-1] / bh_val
-                    wave = wave_values[-1] / wave_val
-
-                    print(','.join([
-                            '{},{},{},{},{},{},{}'.format(
-                                bh, wave, wave - bh,
-                                self.total_value(self.bh), self.total_value(self.wave),
-                                self.g(self.bh), self.g(self.wave)),
-                            ','.join([str(price) for price in self.prices]),
-                            ','.join([str(total_bh / price) for price in self.prices]),
-                            ','.join([str(total_wave / price) for price in self.prices])]))
+            #if max(vals) / frac - 1.0 > self.threshold:
+            #    self.rebalance()
 
 
 if __name__ == '__main__':
     args = parser.parse_args()
 
-    if False:
-        flipper = Flipper(args.delta, args.threshold, args.interval)
-        if args.print_interval_status:
-            header = ','.join([
-                    'bh_gain,wave_gain,diff_gain,bh_value,wave_value,g_bh,g_wave',
-                    ','.join([
-                        'price{}'.format(i) for i in range(args.num_stocks)]),
-                    ','.join([
-                        'potential_val_bh{}'.format(i) for i in range(args.num_stocks)]),
-                    ','.join([
-                        'potential_val_wave{}'.format(i) for i in range(args.num_stocks)])])
-            print(header)
-
+    if False:  # Generic stocks from commandline.
+        flipper = Flipper(args.delta, args.threshold)
         flipper.simulate(args.iterations)
-
         print(flipper, file=sys.stderr)
-    else:
+    elif False:  # Just two stocks.
         bh_results = []
         wave_results = []
         print(args)
         trials = 100
+        successes = []
         for i in range(trials):
-            flipper = Flipper(args.delta, args.threshold, 0)
+            flipper = Flipper(args.delta, args.threshold)
             flipper.simulate(args.iterations)
             bh_results.append(flipper.g(flipper.bh))
             wave_results.append(flipper.g(flipper.wave))
-            print('progress: {} / {} -- {}(min: {}, max: {}, recent: {}), {}\n'.format(i, trials, np.mean(bh_results), min(bh_results), max(bh_results), bh_results[-1], np.mean(wave_results)), end='')
+            print('progress: {} / {} -- {}(min: {}, max: {}, recent: {}), {}, excess: {}\n'.format(i, trials, np.mean(bh_results), min(bh_results), max(bh_results), bh_results[-1], np.mean(wave_results), flipper.excess()), end='')
             sys.stdout.flush()
+            successes.append(flipper.successes(args.iterations))
         print()
         print(np.mean(bh_results), np.mean(wave_results))
+        print(sum(successes))
+        print(f"Mean: {np.mean(successes)}, std: {np.std(successes)}")
+        print(f"Expected mean: {args.iterations // 2}, expected std: {(args.iterations * 0.5 * 0.5) ** 0.5}")
+
+    elif True:  # Rough integral of bh.
+        flipper = Flipper(args.delta, args.threshold)
+        total = flipper.weighted_value(args.iterations)
+        while True:
+            # Imbalances come because a pair of flips go in a direction.
+            flipper.flip_direction(up=True)
+            flipper.flip_direction(up=True)
+            v = flipper.weighted_value(args.iterations)
+            total += v
+            if v < 1e-20:
+                break
+
+        flipper = Flipper(args.delta, args.threshold)
+        while True:
+            # Imbalances come because a pair of flips go in a direction.
+            flipper.flip_direction(up=False)
+            flipper.flip_direction(up=False)
+            v = flipper.weighted_value(args.iterations)
+            total += v
+            if v < 1e-20:
+                break
+
+        print(total)
 
