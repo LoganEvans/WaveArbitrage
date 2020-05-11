@@ -16,8 +16,6 @@ public:
       : num_stocks_(num_stocks), delta_(delta), threshold_(threshold),
         positions_(num_stocks, 1.0), prices_(num_stocks, 1.0),
         norm_dist_(0.0, 1.0) {
-    assert(num_stocks == 2);
-
     unsigned int v = RAND_MAX; // count the number of bits set in v
     unsigned int c;            // c g_accumulates the total bits set in v
     for (c = 0; v; v >>= 1) {
@@ -91,7 +89,7 @@ protected:
   }
 
   void adjust_prices() {
-    if (true) {
+    if (false) {
       if (next_rand()) {
         prices_[0] *= delta_;
         prices_[1] /= delta_;
@@ -103,7 +101,7 @@ protected:
       static constexpr double sigma = 0.02;
       static constexpr double sqrt_dt = 0.062994078834; // (1.0 / 252) ** 0.5
 
-      for (int i = 0; i < 2; i++) {
+      for (int i = 0; i < prices_.size(); i++) {
         prices_[i] = prices_[i] +
                      prices_[i] * (sigma * sqrt_dt * norm_dist_(generator_));
       }
@@ -155,14 +153,13 @@ protected:
   }
 };
 
-void run_experiment(int flips, int num_bh_trials, int num_wave_trials) {
+void run_experiment(int num_stocks, int flips, int num_bh_trials, int num_wave_trials) {
   const auto num_cpus = std::thread::hardware_concurrency();
   const int kBatchSize = 1;
 
   std::mutex mu;
 
   mu.lock();
-  int num_stocks = 2;
 
   int bh_trials_remaining = num_bh_trials;
   bh_trials_remaining -= bh_trials_remaining % kBatchSize;
@@ -277,5 +274,6 @@ int main() {
   // for (int i = 1; i < 1000000000; i = i + 1 + i * 0.1) {
   //  run_experiment(i, 16000, 4000);
   //}
-  run_experiment(/*flips=*/10000000, /*num_bh_trials=*/1, /*num_wave_trials=*/10000);
+  run_experiment(/*num_stocks=*/10, /*flips=*/100000, /*num_bh_trials=*/10000,
+                 /*num_wave_trials=*/10000);
 }
