@@ -97,6 +97,18 @@ protected:
         prices_[0] /= delta_;
         prices_[1] *= delta_;
       }
+    } else if (false) {
+      if (prices_[0] > 0.75 && next_rand()) {
+        prices_[0] -= 0.01;
+      } else {
+        prices_[0] += 0.01;
+      }
+
+      if (prices_[1] > 0.75 && next_rand()) {
+        prices_[1] -= 0.01;
+      } else {
+        prices_[1] += 0.01;
+      }
     } else {
       static constexpr double sigma = 0.02;
       static constexpr double sqrt_dt = 0.062994078834; // (1.0 / 252) ** 0.5
@@ -274,6 +286,6 @@ int main() {
   // for (int i = 1; i < 1000000000; i = i + 1 + i * 0.1) {
   //  run_experiment(i, 16000, 4000);
   //}
-  run_experiment(/*num_stocks=*/10, /*flips=*/100000, /*num_bh_trials=*/10000,
+  run_experiment(/*num_stocks=*/2, /*flips=*/100000, /*num_bh_trials=*/10000,
                  /*num_wave_trials=*/10000);
 }
