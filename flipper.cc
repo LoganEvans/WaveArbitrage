@@ -41,17 +41,17 @@ private:
 
 class Flipper {
 public:
-  Flipper(int num_stocks, double delta, double threshold)
+  Flipper(int num_stocks, double delta, double threshold, double gbm_mu,
+          double gbm_dt, double gbm_sigma)
       : num_stocks_(num_stocks), delta_(delta), threshold_(threshold),
-        positions_(num_stocks, 1.0), prices_(num_stocks, 1.0),
-        norm_dist_(0.0, 1.0) {
+        gbm_mu_(gbm_mu), gbm_dt_(gbm_dt), gbm_sqrt_dt_(sqrt(gbm_dt)),
+        gbm_sigma_(gbm_sigma), positions_(num_stocks, 1.0),
+        prices_(num_stocks, 1.0), norm_dist_(0.0, sqrt(gbm_dt)) {
     unsigned int v = RAND_MAX; // count the number of bits set in v
     unsigned int c;            // c g_accumulates the total bits set in v
     for (c = 0; v; v >>= 1) {
       c += v & 1;
     }
-    num_rand_bits_ = c;
-    next_rand_index_ = c;
     generator_.seed(
         std::chrono::high_resolution_clock().now().time_since_epoch().count());
   }
@@ -60,7 +60,7 @@ public:
 
   double total_shares() {
     double total = 0.0;
-    for (int i = 0; i < positions_.size(); i++) {
+    for (size_t i = 0; i < positions_.size(); i++) {
       total += positions_[i] * prices_[i];
     }
     return total;
@@ -78,7 +78,7 @@ public:
 
   double value() {
     double value = 0.0;
-    for (int i = 0; i < positions_.size(); i++) {
+    for (size_t i = 0; i < positions_.size(); i++) {
       value += positions_[i] * prices_[i];
     }
     return value;
@@ -97,6 +97,12 @@ protected:
   int num_stocks_;
   double delta_;
   double threshold_;
+  // gbm for Geometric Brownian Motion. See
+  // https://en.wikipedia.org/wiki/Geometric_Brownian_motion
+  double gbm_mu_;
+  double gbm_dt_;
+  double gbm_sqrt_dt_;
+  double gbm_sigma_;
   std::vector<double> positions_;
   std::vector<double> prices_;
   std::default_random_engine generator_;
@@ -104,63 +110,28 @@ protected:
 
   virtual void rebalance() {}
 
-  bool next_rand() {
-    if (next_rand_index_ >= num_rand_bits_) {
-      rand_value_ = rand();
-      next_rand_index_ = 0;
-    }
-
-    bool val = false;
-    if (rand_value_ & (1 << next_rand_index_)) {
-      val = true;
-    }
-    next_rand_index_++;
-
-    return val;
-  }
-
   void adjust_prices() {
-    if (false) {
-      if (next_rand()) {
-        prices_[0] *= delta_;
-        prices_[1] /= delta_;
-      } else {
-        prices_[0] /= delta_;
-        prices_[1] *= delta_;
-      }
-    } else if (false) {
-      if (prices_[0] > 0.75 && next_rand()) {
-        prices_[0] -= 0.01;
-      } else {
-        prices_[0] += 0.01;
-      }
-
-      if (prices_[1] > 0.75 && next_rand()) {
-        prices_[1] -= 0.01;
-      } else {
-        prices_[1] += 0.01;
+    if (true) {
+      for (size_t i = 0; i < prices_.size(); i++) {
+        prices_[i] = prices_[i] + prices_[i] * (gbm_sigma_ * gbm_sqrt_dt_ *
+                                                norm_dist_(generator_));
       }
     } else {
-      static constexpr double sigma = 0.02;
-      static constexpr double sqrt_dt = 0.062994078834; // (1.0 / 252) ** 0.5
-
-      for (int i = 0; i < prices_.size(); i++) {
-        prices_[i] = prices_[i] +
-                     prices_[i] * (sigma * sqrt_dt * norm_dist_(generator_));
+      for (size_t i = 0; i < prices_.size(); i++) {
+        prices_[i] =
+            prices_[i] * exp((gbm_mu_ - gbm_sigma_ * gbm_sigma_ / 2) * gbm_dt_ +
+                             gbm_sigma_ * norm_dist_(generator_));
       }
     }
   }
-
-private:
-  int rand_value_;
-  int num_rand_bits_;
-  int next_rand_index_;
 };
 
 class BuyAndHold : public Flipper {
 public:
-  BuyAndHold(int num_stocks, double delta, double threshold)
-      : Flipper(num_stocks, delta, threshold) {}
+  BuyAndHold(int num_stocks, double delta, double threshold, double gbm_mu,
+             double gbm_dt, double gbm_sigma)
+      : Flipper(num_stocks, delta, threshold, /*gbm_mu=*/gbm_mu,
+                /*gbm_dt=*/gbm_dt, /*gbm_sigma=*/gbm_sigma) {}
   ~BuyAndHold() {}
 
 protected:
@@ -169,8 +140,10 @@ protected:
 
 class WaveArbitrage : public Flipper {
 public:
-  WaveArbitrage(int num_stocks, double delta, double threshold)
-      : Flipper(num_stocks, delta, threshold) {}
+  WaveArbitrage(int num_stocks, double delta, double threshold, double gbm_mu,
+                double gbm_dt, double gbm_sigma)
+      : Flipper(num_stocks, delta, threshold, /*gbm_mu=*/gbm_mu,
+                /*gbm_dt=*/gbm_dt, /*gbm_sigma=*/gbm_sigma) {}
   ~WaveArbitrage() {}
 
   int num_rebalances() override { return rebalances_; }
@@ -203,7 +176,8 @@ protected:
 };
 
 void run_experiment(int num_stocks, int flips, int num_bh_trials,
-                    int num_wave_trials) {
+                    int num_wave_trials, double gbm_mu, double gbm_dt,
+                    double gbm_sigma) {
   const auto num_cpus = std::thread::hardware_concurrency();
   const int kBatchSize = 1;
 
@@ -228,16 +202,9 @@ void run_experiment(int num_stocks, int flips, int num_bh_trials,
   mu.unlock();
 
   std::thread threads[num_cpus];
-  for (int i = 0; i < num_cpus; i++) {
+  for (size_t i = 0; i < num_cpus; i++) {
     threads[i] = std::thread(
         [&](int i) {
-          double local_bh_g_acc = 0.0;
-          double local_bh_val_acc = 0.0;
-          double local_wave_g_acc = 0.0;
-          double local_wave_val_acc = 0.0;
-          int local_bh_trials = 0;
-          int local_wave_trials = 0;
-
           while (true) {
             int bh_batch = 0;
             int wave_batch = 0;
@@ -264,11 +231,11 @@ void run_experiment(int num_stocks, int flips, int num_bh_trials,
               break;
             }
 
-            local_bh_trials += bh_batch;
-            local_wave_trials += wave_batch;
-
             for (int trial = 0; trial < bh_batch; trial++) {
-              BuyAndHold bh(num_stocks, delta, threshold);
+              BuyAndHold bh(/*num_stocks=*/num_stocks, /*delta=*/delta,
+                            /*threshold=*/threshold, /*gbm_mu=*/gbm_mu,
+                            /*gbm_dt=*/gbm_dt,
+                            /*gbm_sigma=*/gbm_sigma);
               bh.simulate(flips);
 
               mu.lock();
@@ -278,7 +245,10 @@ void run_experiment(int num_stocks, int flips, int num_bh_trials,
             }
 
             for (int trial = 0; trial < wave_batch; trial++) {
-              WaveArbitrage wave(num_stocks, delta, threshold);
+              WaveArbitrage wave(/*num_stocks=*/num_stocks, /*delta=*/delta,
+                                 /*threshold=*/threshold, /*gbm_mu=*/gbm_mu,
+                                 /*gbm_dt=*/gbm_dt,
+                                 /*gbm_sigma=*/gbm_sigma);
               wave.simulate(flips);
 
               mu.lock();
@@ -292,42 +262,37 @@ void run_experiment(int num_stocks, int flips, int num_bh_trials,
         i);
   }
 
-  for (int i = 0; i < num_cpus; i++) {
+  for (size_t i = 0; i < num_cpus; i++) {
     threads[i].join();
   }
 
-  printf(
-"\n{\n"
-"  \"flips_per_trial\": %d,\n"
-"  \"bh_trials\": %ld,\n"
-"  \"bh_g\": %.10lf,\n"
-"  \"bh_val\": %.10lf,\n"
-"  \"bh_stddev\": %.10lf,\n"
-"  \"wave_trials\": %ld,\n"
-"  \"wave_g\": %.10lf,\n"
-"  \"wave_val\": %.10lf,\n"
-"  \"wave_stddev\": %.10lf,\n"
-"  \"wave_num_rebalances\": %ld,\n"
-"}",
-    flips, 
-    bh_g_stats.count(),
-    bh_g_stats.mean(),
-    bh_val_stats.mean(),
-    bh_val_stats.sample_variance(),
-    wave_g_stats.count(),
-    wave_g_stats.mean(),
-    wave_val_stats.mean(),
-    wave_val_stats.sample_variance(),
-    total_wave_rebalances);
+  printf("\n{\n"
+         "  \"stocks\": %d,\n"
+         "  \"flips_per_trial\": %d,\n"
+         "  \"bh_trials\": %ld,\n"
+         "  \"bh_g\": %.10lf,\n"
+         "  \"bh_val\": %.10lf,\n"
+         "  \"bh_stddev\": %.10lf,\n"
+         "  \"wave_trials\": %ld,\n"
+         "  \"wave_g\": %.10lf,\n"
+         "  \"wave_val\": %.10lf,\n"
+         "  \"wave_stddev\": %.10lf,\n"
+         "  \"wave_num_rebalances\": %ld,\n"
+         "}\n",
+         num_stocks, flips, bh_g_stats.count(), bh_g_stats.mean(),
+         bh_val_stats.mean(), bh_val_stats.sample_variance(),
+         wave_g_stats.count(), wave_g_stats.mean(), wave_val_stats.mean(),
+         wave_val_stats.sample_variance(), total_wave_rebalances);
 }
 
 int main() {
   srand(time(NULL));
   setbuf(stdout, NULL);
 
-  // for (int i = 1; i < 1000000000; i = i + 1 + i * 0.1) {
-  //  run_experiment(i, 16000, 4000);
-  //}
-  run_experiment(/*num_stocks=*/2, /*flips=*/100000, /*num_bh_trials=*/1000,
-                 /*num_wave_trials=*/1000);
+  static constexpr double sigma = 1.0;
+  static constexpr double dt = 1.0 / 252;
+
+  run_experiment(/*num_stocks=*/2, /*flips=*/100000, /*num_bh_trials=*/100000,
+                 /*num_wave_trials=*/100000, /*gbm_mu=*/0.0, /*gbm_dt=*/dt,
+                 /*gbm_sigma=*/sigma);
 }

@@ -1,2 +1,2 @@
 all: flipper.cc
-	$(CXX) -O3 -pthread flipper.cc -o flipper
+	$(CXX) -Wall -Werror -O3 -pthread flipper.cc -o flipper
