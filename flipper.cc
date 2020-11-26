@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <time.h>
 
+#include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -9,6 +10,34 @@
 #include <random>
 #include <thread>
 #include <vector>
+
+class WelfordRunningStatistics {
+public:
+  WelfordRunningStatistics() : count_(0), mean_(0.0), M2_(0.0) {}
+
+  void update(double new_value) {
+    count_++;
+    double delta = new_value - mean_;
+    mean_ += delta / count_;
+    double delta2 = new_value - mean_;
+    M2_ += delta * delta2;
+  }
+
+  int64_t count() { return count_; }
+
+  double mean() { return mean_; }
+
+  double variance() { return M2_ / std::max(static_cast<int64_t>(1), count_); }
+
+  double sample_variance() {
+    return M2_ / std::max(static_cast<int64_t>(1), count_ - 1);
+  };
+
+private:
+  int64_t count_;
+  double mean_;
+  double M2_;
+};
 
 class Flipper {
 public:
@@ -61,6 +90,8 @@ public:
       rebalance();
     }
   }
+
+  virtual int num_rebalances() { return 0; }
 
 protected:
   int num_stocks_;
@@ -142,7 +173,11 @@ public:
       : Flipper(num_stocks, delta, threshold) {}
   ~WaveArbitrage() {}
 
+  int num_rebalances() override { return rebalances_; }
+
 protected:
+  int rebalances_ = 0;
+
   void rebalance() override {
     double dollars_per_stock = total_shares() / num_stocks_;
     double threshold = dollars_per_stock * 1.01;
@@ -159,18 +194,20 @@ protected:
       return;
     }
 
+    rebalances_++;
+
     for (int i = 0; i < num_stocks_; i++) {
       positions_[i] = dollars_per_stock / prices_[i];
     }
   }
 };
 
-void run_experiment(int num_stocks, int flips, int num_bh_trials, int num_wave_trials) {
+void run_experiment(int num_stocks, int flips, int num_bh_trials,
+                    int num_wave_trials) {
   const auto num_cpus = std::thread::hardware_concurrency();
   const int kBatchSize = 1;
 
   std::mutex mu;
-
   mu.lock();
 
   int bh_trials_remaining = num_bh_trials;
@@ -182,13 +219,12 @@ void run_experiment(int num_stocks, int flips, int num_bh_trials, int num_wave_t
   double delta = 1.001;
   double threshold = 1.0;
 
-  std::vector<double> bh_g_accs(num_cpus, 0);
-  std::vector<double> bh_val_accs(num_cpus, 0);
-  std::vector<int> bh_trials(num_cpus, 0);
+  WelfordRunningStatistics bh_g_stats;
+  WelfordRunningStatistics bh_val_stats;
+  WelfordRunningStatistics wave_g_stats;
+  WelfordRunningStatistics wave_val_stats;
+  int64_t total_wave_rebalances = 0;
 
-  std::vector<double> wave_g_accs(num_cpus, 0);
-  std::vector<double> wave_val_accs(num_cpus, 0);
-  std::vector<int> wave_trials(num_cpus, 0);
   mu.unlock();
 
   std::thread threads[num_cpus];
@@ -216,6 +252,12 @@ void run_experiment(int num_stocks, int flips, int num_bh_trials, int num_wave_t
               wave_batch = kBatchSize;
               wave_trials_remaining -= kBatchSize;
             }
+
+            printf("bh: %d/%d, wave: %d/%d\r",
+                   num_bh_trials - bh_trials_remaining, num_bh_trials,
+                   num_wave_trials - wave_trials_remaining, num_wave_trials);
+            fflush(stdout);
+
             mu.unlock();
 
             if (bh_batch == 0 && wave_batch == 0) {
@@ -228,27 +270,24 @@ void run_experiment(int num_stocks, int flips, int num_bh_trials, int num_wave_t
             for (int trial = 0; trial < bh_batch; trial++) {
               BuyAndHold bh(num_stocks, delta, threshold);
               bh.simulate(flips);
-              local_bh_g_acc += bh.g();
-              local_bh_val_acc += bh.value();
+
+              mu.lock();
+              bh_g_stats.update(bh.g());
+              bh_val_stats.update(bh.value());
+              mu.unlock();
             }
 
             for (int trial = 0; trial < wave_batch; trial++) {
               WaveArbitrage wave(num_stocks, delta, threshold);
               wave.simulate(flips);
-              local_wave_g_acc += wave.g();
-              local_wave_val_acc += wave.value();
+
+              mu.lock();
+              wave_g_stats.update(wave.g());
+              wave_val_stats.update(wave.value());
+              total_wave_rebalances += wave.num_rebalances();
+              mu.unlock();
             }
           }
-
-          mu.lock();
-          bh_g_accs[i] = local_bh_g_acc;
-          bh_val_accs[i] = local_bh_val_acc;
-          bh_trials[i] = local_bh_trials;
-
-          wave_g_accs[i] = local_wave_g_acc;
-          wave_val_accs[i] = local_wave_val_acc;
-          wave_trials[i] = local_wave_trials;
-          mu.unlock();
         },
         i);
   }
@@ -257,35 +296,38 @@ void run_experiment(int num_stocks, int flips, int num_bh_trials, int num_wave_t
     threads[i].join();
   }
 
-  double bh_g_acc = 0.0;
-  double bh_val_acc = 0.0;
-  double wave_g_acc = 0.0;
-  double wave_val_acc = 0.0;
-  int total_bh_trials = 0;
-  int total_wave_trials = 0;
-  for (int i = 0; i < num_cpus; i++) {
-    bh_g_acc += bh_g_accs[i];
-    bh_val_acc += bh_val_accs[i];
-    total_bh_trials += bh_trials[i];
-
-    wave_g_acc += wave_g_accs[i];
-    wave_val_acc += wave_val_accs[i];
-    total_wave_trials += wave_trials[i];
-  }
-
-  printf("%d,%.10lf,%.10lf,%.10lf,%.10lf\n", flips, bh_g_acc / total_bh_trials,
-         bh_val_acc / total_bh_trials, wave_g_acc / total_wave_trials,
-         wave_val_acc / total_wave_trials);
+  printf(
+"\n{\n"
+"  \"flips_per_trial\": %d,\n"
+"  \"bh_trials\": %ld,\n"
+"  \"bh_g\": %.10lf,\n"
+"  \"bh_val\": %.10lf,\n"
+"  \"bh_stddev\": %.10lf,\n"
+"  \"wave_trials\": %ld,\n"
+"  \"wave_g\": %.10lf,\n"
+"  \"wave_val\": %.10lf,\n"
+"  \"wave_stddev\": %.10lf,\n"
+"  \"wave_num_rebalances\": %ld,\n"
+"}",
+    flips, 
+    bh_g_stats.count(),
+    bh_g_stats.mean(),
+    bh_val_stats.mean(),
+    bh_val_stats.sample_variance(),
+    wave_g_stats.count(),
+    wave_g_stats.mean(),
+    wave_val_stats.mean(),
+    wave_val_stats.sample_variance(),
+    total_wave_rebalances);
 }
 
 int main() {
   srand(time(NULL));
   setbuf(stdout, NULL);
 
-  printf("flips,bh_g,bh_val,wave_g,wave_val\n");
   // for (int i = 1; i < 1000000000; i = i + 1 + i * 0.1) {
   //  run_experiment(i, 16000, 4000);
   //}
-  run_experiment(/*num_stocks=*/2, /*flips=*/100000, /*num_bh_trials=*/10000,
-                 /*num_wave_trials=*/10000);
+  run_experiment(/*num_stocks=*/2, /*flips=*/100000, /*num_bh_trials=*/1000,
+                 /*num_wave_trials=*/1000);
 }
