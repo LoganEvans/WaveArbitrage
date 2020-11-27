@@ -71,12 +71,12 @@ private:
 
 class Flipper {
 public:
-  Flipper(int num_stocks, double threshold, double gbm_mu,
-          double gbm_dt, double gbm_sigma)
-      : num_stocks_(num_stocks), threshold_(threshold),
-        gbm_mu_(gbm_mu), gbm_dt_(gbm_dt), gbm_sqrt_dt_(sqrt(gbm_dt)),
-        gbm_sigma_(gbm_sigma), positions_(num_stocks, 1.0),
-        prices_(num_stocks, 1.0), norm_dist_(0.0, sqrt(gbm_dt)) {
+  Flipper(int num_stocks, double threshold, double gbm_mu, double gbm_dt,
+          double gbm_sigma)
+      : num_stocks_(num_stocks), threshold_(threshold), gbm_mu_(gbm_mu),
+        gbm_dt_(gbm_dt), gbm_sqrt_dt_(sqrt(gbm_dt)), gbm_sigma_(gbm_sigma),
+        positions_(num_stocks, 1.0), prices_(num_stocks, 1.0),
+        norm_dist_(0.0, 1.0) {
     unsigned int v = RAND_MAX; // count the number of bits set in v
     unsigned int c;            // c g_accumulates the total bits set in v
     for (c = 0; v; v >>= 1) {
@@ -140,7 +140,7 @@ protected:
   virtual void rebalance() {}
 
   void adjust_prices() {
-    if (true) {
+    if (false) {
       for (size_t i = 0; i < prices_.size(); i++) {
         prices_[i] = prices_[i] + prices_[i] * (gbm_sigma_ * gbm_sqrt_dt_ *
                                                 norm_dist_(generator_));
@@ -182,7 +182,7 @@ protected:
 
   void rebalance() override {
     double dollars_per_stock = total_shares() / num_stocks_;
-    double threshold = dollars_per_stock * 1.01;
+    double threshold = dollars_per_stock * threshold_;
 
     bool skip_rebalance = true;
     for (int i = 0; i < num_stocks_; i++) {
@@ -212,7 +212,8 @@ void run_experiment(int num_stocks, int flips, int num_trials, double gbm_mu,
   mu.lock();
 
   int trials_remaining = num_trials;
-  double threshold = 1.0;
+  // Use threshold = 1.0 to rebalance after every price adjustment.
+  double threshold = 1.05;
   WelfordRunningStatistics bh_g_stats;
   WelfordRunningStatistics bh_val_stats;
   WelfordRunningStatistics wave_g_stats;
@@ -297,9 +298,9 @@ int main() {
   srand(time(NULL));
   setbuf(stdout, NULL);
 
-  static constexpr double sigma = 1.0;
+  static constexpr double sigma = 1.0 / 252;
   static constexpr double dt = 1.0 / 252;
 
-  run_experiment(/*num_stocks=*/2, /*flips=*/100000, /*num_trials=*/1000,
+  run_experiment(/*num_stocks=*/2, /*flips=*/100000, /*num_trials=*/100000,
                  /*gbm_mu=*/0.0, /*gbm_dt=*/dt, /*gbm_sigma=*/sigma);
 }
