@@ -1,0 +1,27 @@
+syntax = "proto2";
+
+package market_data;
+
+import "google/protobuf/timestamp.proto";
+
+message Trade {
+  optional string symbol = 1;
+  optional google.protobuf.Timestamp timestamp = 2;
+  optional int32 shares = 3;
+  // Prices are one-ten-thousandth of a dollar
+  optional int32 price = 4;
+}
+
+message SecurityDirectory {
+  optional string symbol = 1;
+  optional google.protobuf.Timestamp timestamp = 2;
+  optional int32 round_lot = 3;
+  optional int32 adjusted_poc_price = 4;
+}
+
+message Event {
+  oneof event {
+    Trade trade = 1;
+    SecurityDirectory security_directory = 2;
+  }
+}
