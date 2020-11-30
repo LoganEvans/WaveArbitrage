@@ -19,9 +19,12 @@ message SecurityDirectory {
   optional int32 adjusted_poc_price = 4;
 }
 
-message Event {
-  oneof event {
-    Trade trade = 1;
-    SecurityDirectory security_directory = 2;
+message Events {
+  message Event {
+    oneof event {
+      Trade trade = 1;
+      SecurityDirectory security_directory = 2;
+    }
   }
+  repeated Event events = 1;
 }

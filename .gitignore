@@ -1,3 +1,9 @@
+market_data_pb2.py
+flipper
+IEX_data/*
+processed/*
+*.swp
+
 *.out
 
 # Byte-compiled / optimized / DLL files
