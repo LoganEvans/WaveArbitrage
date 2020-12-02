@@ -19,11 +19,29 @@ message SecurityDirectory {
   optional int32 adjusted_poc_price = 4;
 }
 
+message QuoteUpdate {
+  optional string symbol = 1;
+  optional google.protobuf.Timestamp timestamp = 2;
+  optional int32 bid_size = 3;
+  optional int32 bid_price = 4;
+  optional int32 ask_size = 5;
+  optional int32 ask_price = 6;
+}
+
+message OfficialPrice {
+  optional string symbol = 1;
+  optional google.protobuf.Timestamp timestamp = 2;
+  optional int32 price = 3;
+  optional string price_type = 4;
+}
+
 message Events {
   message Event {
     oneof event {
       Trade trade = 1;
       SecurityDirectory security_directory = 2;
+      QuoteUpdate quote_update = 3;
+      OfficialPrice official_price = 4;
     }
   }
   repeated Event events = 1;
