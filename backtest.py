@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from datetime import datetime
 from multiprocessing import Pool
 from pprint import pprint
@@ -38,7 +39,7 @@ parser.add_argument(
         help="Mutexes for claiming work.")
 args = parser.parse_args()
 
-SP500_2015 = set([
+SP500_2015 = [
         'ABT', 'ABBV', 'ACN', 'ACE', 'ADBE', 'ADT', 'AAP', 'AES', 'AET', 'AFL',
         'AMG', 'A', 'GAS', 'APD', 'ARG', 'AKAM', 'AA', 'AGN', 'ALXN', 'ALLE',
         'ADS', 'ALL', 'ALTR', 'MO', 'AMZN', 'AEE', 'AAL', 'AEP', 'AXP', 'AIG',
@@ -90,7 +91,8 @@ SP500_2015 = set([
         'WM', 'WAT', 'ANTM', 'WFC', 'WDC', 'WU', 'WY', 'WHR', 'WFM', 'WMB',
         'WEC', 'WYN', 'WYNN', 'XEL', 'XRX', 'XLNX', 'XL', 'XYL', 'YHOO', 'YUM',
         'ZBH', 'ZION', 'ZTS',
-    ])
+    ]
+SP500_2015_SET = set(SP500_2015)
 
 class BacktestException(Exception):
     pass
@@ -120,8 +122,12 @@ class Processor:
         work_mutex = os.path.join(args.work_claimed_folder, date_to_str(date))
         os.open(work_mutex, os.O_CREAT | os.O_EXCL)
 
-        keys = set(SP500_2015)
-        self.processed = {key: market_data_pb2.Events() for key in keys}
+        check_file = self.filename(date, SP500_2015[-1])
+        if check_file in os.listdir(args.processed_folder):
+            return
+
+        self.processed = OrderedDict([
+                (key, market_data_pb2.Events()) for key in SP500_2015])
 
         version = 1.6
         if date < datetime(2017, 8, 26):
@@ -136,7 +142,7 @@ class Processor:
             try:
                 p = IEXTools.Parser(raw, tops_version=version)
                 break
-            except FileNotFoundError:
+            except (FileNotFoundError, IndexError):
                 tries -= 1
                 time.sleep(1)
         else:
@@ -155,7 +161,7 @@ class Processor:
             except StopIteration:
                 break
 
-            if m.symbol not in SP500_2015:
+            if m.symbol not in SP500_2015_SET:
                 continue
 
             event = self.processed[m.symbol].events.add()
