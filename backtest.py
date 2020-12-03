@@ -123,6 +123,10 @@ class Processor:
         keys = set(SP500_2015)
         self.processed = {key: market_data_pb2.Events() for key in keys}
 
+        version = 1.6
+        if date < datetime(2017, 8, 26):
+            version = 1.5
+
         tries = 3
         while tries:
             raw = download_pcap(date)
@@ -130,7 +134,7 @@ class Processor:
                 return
 
             try:
-                p = IEXTools.Parser(raw)
+                p = IEXTools.Parser(raw, tops_version=version)
                 break
             except FileNotFoundError:
                 tries -= 1
@@ -139,8 +143,11 @@ class Processor:
             raise BacktestException(f"Exhausted tries to download pcap {date}")
 
         allowed = [
-            IEXTools.messages.TradeReport, IEXTools.messages.SecurityDirective,
-            IEXTools.messages.QuoteUpdate, IEXTools.messages.OfficialPrice]
+                IEXTools.messages.TradeReport,
+                IEXTools.messages.SecurityDirective,
+                #IEXTools.messages.QuoteUpdate,
+                IEXTools.messages.OfficialPrice,
+            ]
 
         while True:
             try:

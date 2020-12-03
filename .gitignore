@@ -6,8 +6,9 @@ work_claimed/*
 *.pb.cc
 *.pb.h
 *.swp
-
 *.out
+*.o
+backtest
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
