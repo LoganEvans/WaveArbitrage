@@ -1,10 +1,38 @@
 from datetime import datetime
-import IEXTools
-import os
-import market_data_pb2
+from multiprocessing import Pool
 from pprint import pprint
+import IEXTools
+import argparse
+import market_data_pb2
+import os
+import time
+
+
+def debug(f):
+    def spilled_milk(*args, **kwargs):
+        print("> {name}({args}, {kwargs})".format(
+            name=f.__name__,
+            args=", ".join([str(arg) for arg in args]),
+            kwargs=", ".join(
+                [f"{key}={value}" for key, value in kwargs.items()])))
+        res = f(*args, **kwargs)
+        print(f"< {f.__name__} #=> {str(res)[:100]}")
+        return res
+    return spilled_milk
+
 
 FPATH = os.path.split(os.path.abspath(__file__))[0]
+
+parser = argparse.ArgumentParser(description="Parse historical data")
+parser.add_argument(
+        "--processed_folder", type=str,
+        default=os.path.join(FPATH, "processed"),
+        help="Location for processed protos.")
+parser.add_argument(
+        "--download_folder", type=str,
+        default=os.path.join(FPATH, "IEX_data"),
+        help="Location for PCAP data.")
+args = parser.parse_args()
 
 SP500_2015 = set([
         'ABT', 'ABBV', 'ACN', 'ACE', 'ADBE', 'ADT', 'AAP', 'AES', 'AET', 'AFL',
@@ -64,43 +92,56 @@ class BacktestException(Exception):
     pass
 
 
-class Processor:
-    def __init__(self, processed_folder=os.path.join(FPATH, "processed")):
-        if not os.path.exists(processed_folder):
-            os.mkdir(processed_folder)
-        self.processed_folder = processed_folder
+prev_processed = set()
+if os.path.exists(args.processed_folder):
+    for f in os.listdir(args.processed_folder):
+        _, date = f.split("_")
+        prev_processed.add(date)
 
+
+def date_to_str(date: datetime) -> str:
+    return f"{date.year}{date.month:0>2}{date.day:0>2}"
+
+
+class Processor:
     def filename(self, date: datetime, symbol: str):
         return os.path.join(
-            self.processed_folder,
-            f"{symbol}_{date.year}{date.month:2>0}{date.day:0>2}")
+            args.processed_folder,
+            f"{symbol}_{date_to_str(date)}")
 
     def process(self, date: datetime):
-        keys = set(SP500_2015)
-        to_remove = set()
-        prev_processed = os.listdir(self.processed_folder)
-        for key in keys:
-            if self.filename(date, key) in prev_processed:
-                prev_processed.add(key)
-        keys.difference_update(to_remove)
-        if not keys:
+        if date_to_str(date) in prev_processed:
             return
 
+        keys = set(SP500_2015)
         self.processed = {key: market_data_pb2.Events() for key in keys}
 
-        dl = Downloader()
-        raw = dl.download(date)
-        if raw is None:
-            raise BacktestException(f"No data for date '{date}'")
-        p = IEXTools.Parser(raw)
+        tries = 3
+        while tries:
+            raw = download_pcap(date)
+            if raw is None:
+                return
+
+            try:
+                p = IEXTools.Parser(raw)
+                break
+            except FileNotFoundError:
+                tries -= 1
+                time.sleep(1)
+
+        else:
+            raise BacktestException(f"Exhausted tries to download pcap {date}")
+
         allowed = [
             IEXTools.messages.TradeReport, IEXTools.messages.SecurityDirective,
             IEXTools.messages.QuoteUpdate, IEXTools.messages.OfficialPrice]
 
-        m = True
-        i = 0
-        while m:
-            m = p.get_next_message(allowed)
+        while True:
+            try:
+                m = p.get_next_message(allowed)
+            except StopIteration:
+                break
+
             if m.symbol not in SP500_2015:
                 continue
 
@@ -135,30 +176,53 @@ class Processor:
             event_type.timestamp.FromDatetime(
                     datetime.utcfromtimestamp(m.timestamp / int(1e9)))
 
+        os.remove(raw)
+
         for key, proto in self.processed.items():
             with open(self.filename(date, key), "wb") as fout:
                 fout.write(proto.SerializeToString())
 
 
-class Downloader:
-    def __init__(self, tops_folder: str=os.path.join(FPATH, "IEX_data")):
-        self.tops_folder = tops_folder
+@debug
+def download_pcap(date: datetime):
+    prefix = date_to_str(date)
+    if prefix in prev_processed:
+        return
 
-    def download(self, date: datetime):
-        prefix = f"{date.year}{date.month:0>2}{date.day:0>2}"
-        for fname in os.listdir(self.tops_folder):
-            if fname.startswith(prefix):
-                return os.path.join(self.tops_folder, fname)
+    for fname in os.listdir(args.download_folder):
+        if fname.startswith(prefix):
+            return os.path.join(args.download_folder, fname)
 
-        dl = IEXTools.DataDownloader(self.tops_folder)
+    try:
+        dl = IEXTools.DataDownloader(args.download_folder)
         return dl.download_decompressed(date, feed_type="tops")
+    except IEXTools.IEXHISTExceptions.RequestsException:
+        return
 
 
 if __name__ == "__main__":
-    d = Downloader()
-    #print(d.download_decompressed(datetime(2018, 7, 13), feed_type="tops"))
-    date = datetime(2018, 7, 13)
-    d.download(date)
+    for path in [args.processed_folder, args.download_folder]:
+        if not os.path.exists(path):
+            os.mkdir(path)
+
+    if not os.path.exists(args.processed_folder):
+        os.mkdir(args.processed_folder)
 
     p = Processor()
-    p.process(date)
+    results = []
+    with Pool(processes=4) as pool:
+        for year in range(2016, 2022):
+            for month in range(1, 13):
+                for day in range(1, 32):
+                    date = datetime(2016, 1, 1)
+                    try:
+                        date = datetime(year, month, day)
+                    except ValueError:
+                        continue
+
+                    results.append(pool.apply_async(p.process, (date,)))
+                    #p.process(date)
+
+        for result in results:
+            result.get()
+
