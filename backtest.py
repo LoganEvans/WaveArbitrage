@@ -32,6 +32,10 @@ parser.add_argument(
         "--download_folder", type=str,
         default=os.path.join(FPATH, "IEX_data"),
         help="Location for PCAP data.")
+parser.add_argument(
+        "--work_claimed_folder", type=str,
+        default=os.path.join(FPATH, "work_claimed"),
+        help="Mutexes for claiming work.")
 args = parser.parse_args()
 
 SP500_2015 = set([
@@ -113,6 +117,9 @@ class Processor:
         if date_to_str(date) in prev_processed:
             return
 
+        work_mutex = os.path.join(args.work_claimed_folder, date_to_str(date))
+        os.open(work_mutex, os.O_CREAT | os.O_EXCL)
+
         keys = set(SP500_2015)
         self.processed = {key: market_data_pb2.Events() for key in keys}
 
@@ -128,7 +135,6 @@ class Processor:
             except FileNotFoundError:
                 tries -= 1
                 time.sleep(1)
-
         else:
             raise BacktestException(f"Exhausted tries to download pcap {date}")
 
@@ -201,7 +207,8 @@ def download_pcap(date: datetime):
 
 
 if __name__ == "__main__":
-    for path in [args.processed_folder, args.download_folder]:
+    for path in [args.processed_folder, args.download_folder,
+                 args.work_claimed_folder]:
         if not os.path.exists(path):
             os.mkdir(path)
 
@@ -209,20 +216,16 @@ if __name__ == "__main__":
         os.mkdir(args.processed_folder)
 
     p = Processor()
-    results = []
-    with Pool(processes=4) as pool:
-        for year in range(2016, 2022):
-            for month in range(1, 13):
-                for day in range(1, 32):
-                    date = datetime(2016, 1, 1)
-                    try:
-                        date = datetime(year, month, day)
-                    except ValueError:
-                        continue
-
-                    results.append(pool.apply_async(p.process, (date,)))
-                    #p.process(date)
-
-        for result in results:
-            result.get()
+    for year in range(2016, 2022):
+        for month in range(1, 13):
+            for day in range(1, 32):
+                date = datetime(2016, 1, 1)
+                try:
+                    date = datetime(year, month, day)
+                except ValueError:
+                    continue
+                try:
+                    p.process(date)
+                except FileExistsError:
+                    pass
 

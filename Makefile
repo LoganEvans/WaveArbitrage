@@ -7,7 +7,7 @@ clean_flipper: flipper
 	rm flipper
 
 proto: market_data.proto
-	protoc -I=. --python_out=. market_data.proto
+	protoc -I=. --python_out=. --cpp_out=. market_data.proto
 
 clean_proto: market_data_pb2.py
 	rm market_data_pb2.py
