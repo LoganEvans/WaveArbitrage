@@ -142,7 +142,7 @@ class Processor:
             try:
                 p = IEXTools.Parser(raw, tops_version=version)
                 break
-            except (FileNotFoundError, IndexError):
+            except Exception:
                 tries -= 1
                 time.sleep(1)
         else:
