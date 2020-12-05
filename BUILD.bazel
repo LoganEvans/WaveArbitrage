@@ -1,0 +1,54 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library")
+load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
+load("@rules_foreign_cc//tools/build_defs:cmake.bzl", "cmake_external")
+
+proto_library(
+    name = "market_data_proto",
+    srcs = ["market_data.proto"],
+    deps = ["@com_google_protobuf//:timestamp_proto"],
+)
+
+cc_proto_library(
+    name = "market_data_cc_proto",
+    deps = [":market_data_proto"],
+)
+
+py_proto_library(
+    name = "market_data_py_proto",
+    srcs = ["market_data.proto"],
+    deps = ["@com_google_protobuf//:protobuf_python"],
+)
+
+py_binary(
+    name = "scraper",
+    srcs = ["scraper.py"],
+    deps = [
+        ":market_data_py_proto",
+    ],
+)
+
+cc_library(
+    name = "dhist",
+    srcs = ["lib/DynamicHistogram/cpp/src/DynamicHistogram.cpp"],
+    hdrs = ["lib/DynamicHistogram/cpp/src/DynamicHistogram.h"],
+    copts = ["-std=c++17"]
+)
+
+cc_binary(
+    name = "simulate",
+    srcs = ["simulate.cpp"],
+    deps = [
+      ":dhist",
+    ],
+    linkopts = ["-lpthread"],
+)
+
+cc_binary(
+    name = "backtest",
+    srcs = ["backtest.cpp"],
+    deps = [
+        ":market_data_cc_proto",
+    ],
+    linkopts = ["-lpthread"],
+    copts = ["-std=c++17"]
+)

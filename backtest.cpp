@@ -11,9 +11,11 @@
 #include "market_data.pb.h"
 
 std::vector<std::string> get_processed(std::string symbol) {
+  static const std::string kProcessedDir =
+      "/home/logan/repos/WaveArbitrage/processed/";
+  std::string comparison = kProcessedDir + symbol;
   std::vector<std::string> res;
-  std::string comparison = "processed/" + symbol;
-  for (const auto & f : std::filesystem::directory_iterator("processed")) {
+  for (const auto & f : std::filesystem::directory_iterator(kProcessedDir)) {
     if (0 == f.path().string().compare(0, comparison.size(), comparison)) {
       res.push_back(f.path());
     }

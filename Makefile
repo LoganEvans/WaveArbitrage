@@ -1,5 +1,6 @@
-all: flipper proto backtest
+all: simulate proto backtest
 
+CC=clang
 CXX=clang++
 CXX_FLAGS=-Wall -Werror -O3 -std=c++17
 
@@ -12,11 +13,11 @@ backtest: backtest.o market_data.pb.o
 clean_backtest:
 	rm -f backtest
 
-flipper: flipper.cc
-	$(CXX) $(CXX_FLAGS) -pthread flipper.cc -o flipper
+simulate: simulate.cc
+	$(CXX) $(CXX_FLAGS) -pthread simulate.cc -o simulate
 
-clean_flipper:
-	rm -f flipper
+clean_simulate:
+	rm -f simulate
 
 proto: market_data.proto
 	protoc -I=. --python_out=. --cpp_out=. market_data.proto
@@ -29,5 +30,6 @@ clean_proto:
 	rm -f market_data.pb.cc
 	rm -f market_data.pb.h
 
-clean: clean_flipper clean_proto clean_backtest
+clean: clean_simulate clean_proto clean_backtest
 	rm -f *.o
+

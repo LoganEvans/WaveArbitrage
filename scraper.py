@@ -22,7 +22,7 @@ def debug(f):
     return spilled_milk
 
 
-FPATH = os.path.split(os.path.abspath(__file__))[0]
+FPATH = "/home/logan/data"
 
 parser = argparse.ArgumentParser(description="Parse historical data")
 parser.add_argument(

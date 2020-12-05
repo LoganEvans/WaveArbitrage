@@ -9,6 +9,8 @@ work_claimed/*
 *.out
 *.o
 backtest
+simulate
+bazel-*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
