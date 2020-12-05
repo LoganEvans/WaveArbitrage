@@ -32,7 +32,10 @@ int main() {
     std::fstream input(f, std::ios::in | std::ios::binary);
     events.ParseFromIstream(&input);
     for (auto event : events.events()) {
-      printf("%lf\n", event.trade().price() / 10000.0);
+      // XXX Check that it's actually a trade! event.has_trade()
+      if (event.has_trade()) {
+        printf("%lf\n", event.trade().price() / 10000.0);
+      }
     }
   }
 

@@ -1,0 +1,3 @@
+[submodule "lib/DynamicHistogram"]
+	path = lib/DynamicHistogram
+	url = git@github.com:Big-Theta/DynamicHistogram.git
