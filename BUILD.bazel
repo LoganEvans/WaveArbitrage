@@ -52,3 +52,22 @@ cc_binary(
     linkopts = ["-lpthread"],
     copts = ["-std=c++17"]
 )
+
+cc_library(
+    name = "portfolio",
+    srcs = [],
+    hdrs = ["portfolio.h"],
+    deps = [
+        "@com_github_google_glog//:glog"
+    ],
+)
+
+cc_test(
+    name = "portfolio_test",
+    srcs = ["portfolio_test.cpp"],
+    deps = [
+        ":portfolio",
+        "@gtest//:gtest",
+        "@gtest//:gtest_main"
+    ],
+)

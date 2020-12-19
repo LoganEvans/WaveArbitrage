@@ -1,9 +1,9 @@
 #include <stdio.h>
 
 #include <algorithm>
-#include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -12,10 +12,10 @@
 
 std::vector<std::string> get_processed(std::string symbol) {
   static const std::string kProcessedDir =
-      "/home/logan/repos/WaveArbitrage/processed/";
+      "/home/logan/data/processed/";
   std::string comparison = kProcessedDir + symbol;
   std::vector<std::string> res;
-  for (const auto & f : std::filesystem::directory_iterator(kProcessedDir)) {
+  for (const auto &f : std::filesystem::directory_iterator(kProcessedDir)) {
     if (0 == f.path().string().compare(0, comparison.size(), comparison)) {
       res.push_back(f.path());
     }
@@ -26,17 +26,17 @@ std::vector<std::string> get_processed(std::string symbol) {
   return res;
 }
 
-
 int main() {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
   market_data::Events events;
-  for (auto f : get_processed("AMZN")) {
+  for (auto f : get_processed("PPL")) {
     std::fstream input(f, std::ios::in | std::ios::binary);
     events.ParseFromIstream(&input);
     for (auto event : events.events()) {
-      // XXX Check that it's actually a trade! event.has_trade()
       if (event.has_trade()) {
         printf("%lf\n", event.trade().price() / 10000.0);
+      } else {
+        printf("here: %s\n", event.DebugString().c_str());
       }
     }
   }
