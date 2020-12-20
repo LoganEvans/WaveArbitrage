@@ -92,3 +92,42 @@ cc_test(
         "@gtest//:gtest_main"
     ],
 )
+
+cc_library(
+    name = "feed",
+    srcs = [],
+    hdrs = ["feed.h"],
+    deps = [
+        ":portfolio",
+        "@com_github_google_glog//:glog"
+    ],
+)
+
+cc_test(
+    name = "feed_test",
+    srcs = ["feed_test.cpp"],
+    deps = [
+        ":feed",
+        "@gtest//:gtest",
+        "@gtest//:gtest_main"
+    ],
+)
+
+cc_library(
+    name = "util",
+    srcs = [],
+    hdrs = ["util.h"],
+    deps = [
+        "@com_github_google_glog//:glog"
+    ],
+)
+
+cc_test(
+    name = "util_test",
+    srcs = ["util_test.cpp"],
+    deps = [
+        ":util",
+        "@gtest//:gtest",
+        "@gtest//:gtest_main"
+    ],
+)

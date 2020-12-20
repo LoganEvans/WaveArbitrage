@@ -35,6 +35,14 @@ public:
     rebalances_++;
   }
 
+  void pay_dividend(string symbol, double per_share) {
+    folio_.pay_dividend(portfolio().index(symbol), per_share);
+  }
+
+  void stock_split(string symbol, double ratio) {
+    folio_.stock_split(portfolio().index(symbol), ratio);
+  }
+
 protected:
   Portfolio folio_;
   int rebalances_ = 0;
@@ -50,7 +58,17 @@ public:
 
   string strategy_name() const { return "BuyAndHold"; }
 
-  bool price_event(const std::vector<double> &prices) { return false; }
+  bool price_event(const std::vector<double> &prices) {
+    if (portfolio().cash() == 0.0) {
+      return false;
+    }
+    // Reinvest dividends.
+    double per_share = portfolio().cash() / prices.size();
+    for (size_t i = 0; i < prices.size(); i++) {
+      folio_.buy(i, /*quantity=*/per_share / prices[i], /*price=*/prices[i]);
+    }
+    return true;
+  }
 };
 
 class WaveArbitrage : public Strategy {
@@ -65,6 +83,11 @@ public:
   string strategy_name() const { return "WaveArbitrage"; }
 
   bool price_event(const std::vector<double> &prices) {
+    if (portfolio().cash() != 0.0) {
+      rebalance(prices);
+      return true;
+    }
+
     const double shares0 = portfolio().shares(0);
     double min_value = shares0 * prices[0];
     double max_value = shares0 * prices[0];

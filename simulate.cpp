@@ -77,11 +77,6 @@ public:
         gbm_dt_(gbm_dt), gbm_sqrt_dt_(sqrt(gbm_dt)), gbm_sigma_(gbm_sigma),
         positions_(num_stocks, 1.0), prices_(num_stocks, 1.0),
         norm_dist_(0.0, 1.0) {
-    unsigned int v = RAND_MAX; // count the number of bits set in v
-    unsigned int c;            // c g_accumulates the total bits set in v
-    for (c = 0; v; v >>= 1) {
-      c += v & 1;
-    }
     generator_.seed(
         std::chrono::high_resolution_clock().now().time_since_epoch().count());
   }

@@ -38,7 +38,9 @@ public:
 
   int index(string symbol) const {
     auto found = std::find(symbols_.begin(), symbols_.end(), symbol);
-    CHECK(found != symbols_.end());
+    if (found == symbols_.end()) {
+      return -1;
+    }
     return std::distance(symbols_.begin(), found);
   }
 
@@ -73,6 +75,14 @@ public:
 
     shares_[symbol_index] -= quantity;
     cash_ += quantity * price;
+  }
+
+  void pay_dividend(size_t symbol_index, double per_share) {
+    cash_ += shares_[symbol_index] * per_share;
+  }
+
+  void stock_split(size_t symbol_index, double ratio) {
+    shares_[symbol_index] *= ratio;
   }
 
 private:

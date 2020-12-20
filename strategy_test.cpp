@@ -1,3 +1,5 @@
+#include <glog/logging.h>
+
 #include "gtest/gtest.h"
 #include "strategy.h"
 
@@ -13,7 +15,21 @@ TEST(StrategyTest, BuyAndHold) {
 
 TEST(StrategyTest, WaveArbitrage) {
   WaveArbitrage wave(1000, {"FOO", "BAR"}, {10.0, 5.0}, 1.0);
-  EXPECT_FALSE(wave.price_event({5.0, 10.0})) << wave.to_string();
+  EXPECT_TRUE(wave.price_event({5.0, 10.0}));
+}
+
+TEST(StrategyTest, Dividend) {
+  std::vector<double> prices = {10.0, 5.0};
+  BuyAndHold bh(1000, {"FOO", "BAR"}, prices);
+  bh.pay_dividend("FOO", 0.01);
+  EXPECT_EQ(bh.portfolio().cash(), 0.5);
+}
+
+TEST(StrategyTest, Split) {
+  std::vector<double> prices = {10.0, 5.0};
+  BuyAndHold bh(1000, {"FOO", "BAR"}, prices);
+  bh.stock_split("FOO", 2.0);
+  EXPECT_EQ(bh.portfolio().shares(0), 100);
 }
 
 int main(int argc, char **argv) {
