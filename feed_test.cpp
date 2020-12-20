@@ -4,7 +4,7 @@
 #include "feed.h"
 
 TEST(FeedTest, Random) {
-  Feed feed({1.0, 1.0}, 1.0 / 252, 1.0 / 252);
+  RandomFeed feed({1.0, 1.0}, 1.0 / 252, 1.0 / 252);
   EXPECT_EQ(feed.prices()[0], 1.0);
 
   // The normal generator *could* produce a 0.0, but the odds of it doing so 10
