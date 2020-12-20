@@ -4,8 +4,8 @@
 #include <algorithm>
 #include <string>
 
+#include "absl/strings/str_join.h"
 #include <glog/logging.h>
-
 
 using std::string;
 
@@ -16,17 +16,40 @@ public:
     shares_.resize(symbols_.size());
   }
 
-  int index(string symbol) {
+  string to_string(int indent = 0) const {
+    string top_indent = "";
+    for (int i = 0; i < indent; i++) {
+      absl::StrAppend(&top_indent, " ");
+    }
+
+    string middle_indent = "";
+    for (int i = 0; i < indent + 2; i++) {
+      absl::StrAppend(&middle_indent, " ");
+    }
+
+    string s = absl::StrCat(top_indent, "Portfolio {\n", middle_indent,
+                            "cash: $", cash_, ",\n");
+    for (size_t i = 0; i < symbols_.size(); i++) {
+      absl::StrAppend(&s, middle_indent, symbols_[i], ": ", shares_[i], ",\n");
+    }
+    absl::StrAppend(&s, top_indent, "}");
+    return s;
+  }
+
+  int index(string symbol) const {
     auto found = std::find(symbols_.begin(), symbols_.end(), symbol);
     CHECK(found != symbols_.end());
     return std::distance(symbols_.begin(), found);
   }
 
-  double cash() { return cash_; }
+  double cash() const { return cash_; }
 
-  double shares(int symbol_index) { return shares_[symbol_index]; }
+  double shares(size_t symbol_index) const {
+    CHECK_LT(symbol_index, shares_.size());
+    return shares_[symbol_index];
+  }
 
-  double value(const std::vector<double>& prices) {
+  double value(const std::vector<double> &prices) const {
     CHECK_EQ(prices.size(), shares_.size());
 
     double value = cash_;
@@ -36,7 +59,7 @@ public:
     return value;
   }
 
-  void buy(int symbol_index, double quantity, double price) {
+  void buy(size_t symbol_index, double quantity, double price) {
     double cost = quantity * price;
 
     CHECK_LE(cost, cash_);
@@ -45,7 +68,7 @@ public:
     shares_[symbol_index] += quantity;
   }
 
-  void sell(int symbol_index, double quantity, double price) {
+  void sell(size_t symbol_index, double quantity, double price) {
     CHECK_LE(quantity, shares_[symbol_index]);
 
     shares_[symbol_index] -= quantity;
