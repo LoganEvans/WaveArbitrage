@@ -5,6 +5,7 @@
 #include <random>
 
 #include <glog/logging.h>
+#include <google/protobuf/util/time_util.h>
 
 #include "market_data.pb.h"
 
