@@ -47,7 +47,9 @@ cc_binary(
     name = "backtest",
     srcs = ["backtest.cpp"],
     deps = [
+        ":feed",
         ":market_data_cc_proto",
+        ":strategy",
     ],
     linkopts = ["-lpthread"],
     copts = ["-std=c++17"]
@@ -59,7 +61,6 @@ cc_library(
     hdrs = ["portfolio.h"],
     deps = [
         "@com_github_google_glog//:glog",
-        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -79,7 +80,7 @@ cc_library(
     hdrs = ["strategy.h"],
     deps = [
         ":portfolio",
-        "@com_github_google_glog//:glog"
+        "@com_github_google_glog//:glog",
     ],
 )
 
@@ -100,7 +101,7 @@ cc_library(
     deps = [
         ":market_data_cc_proto",
         ":portfolio",
-        "@com_github_google_glog//:glog"
+        "@com_github_google_glog//:glog",
     ],
 )
 

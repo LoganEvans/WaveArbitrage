@@ -1,6 +1,8 @@
 #ifndef WAVE_ARBITRAGE_STRATEGY_H
 #define WAVE_ARBITRAGE_STRATEGY_H
 
+#include <string>
+
 #include "portfolio.h"
 
 using std::string;
@@ -10,11 +12,21 @@ public:
   Strategy(double cash, std::vector<string> symbols)
       : folio_(cash, symbols) {}
 
-  string to_string() const {
-    string s = absl::StrCat(strategy_name(), " {\n");
-    absl::StrAppend(&s, "  rebalances: ", rebalances_, ",\n");
-    absl::StrAppend(&s, portfolio().to_string(2), "\n");
-    absl::StrAppend(&s, "}");
+  string to_string(const std::vector<double> &prices, int indent = 0) const {
+    string top_indent = "";
+    for (int i = 0; i < indent; i++) {
+      top_indent += " ";
+    }
+
+    string middle_indent = "";
+    for (int i = 0; i < indent + 2; i++) {
+      middle_indent += " ";
+    }
+
+    string s = top_indent + strategy_name() + " {\n";
+    s += middle_indent + "rebalances: " + std::to_string(rebalances_) + ",\n";
+    s += middle_indent + portfolio().to_string(prices, indent + 2) + "\n";
+    s += top_indent + "}";
     return s;
   }
 
@@ -26,8 +38,10 @@ public:
 
   void rebalance(const std::vector<double> &prices) {
     for (size_t i = 0; i < prices.size(); i++) {
-      folio_.sell(i, folio_.shares(i), prices[i]);
+      CHECK_GE(portfolio().shares(i), 0.0) << rebalances_;
+      folio_.sell(i, portfolio().shares(i), prices[i]);
     }
+
     double per_stock = portfolio().cash() / prices.size();
     for (size_t i = 0; i < prices.size(); i++) {
       folio_.buy(i, per_stock / prices[i], prices[i]);
@@ -52,14 +66,15 @@ class BuyAndHold : public Strategy {
 public:
   BuyAndHold(double cash, std::vector<string> symbols,
              const std::vector<double> &prices)
-      : Strategy(cash, std::move(symbols)) {
+      : Strategy(cash, std::move(symbols)),
+        rebalance_cash_(prices.size() * 0.01) {
     rebalance(prices);
   }
 
   string strategy_name() const { return "BuyAndHold"; }
 
   bool price_event(const std::vector<double> &prices) {
-    if (portfolio().cash() == 0.0) {
+    if (portfolio().cash() < rebalance_cash_) {
       return false;
     }
     // Reinvest dividends.
@@ -69,6 +84,9 @@ public:
     }
     return true;
   }
+
+protected:
+  const double rebalance_cash_;
 };
 
 class WaveArbitrage : public Strategy {

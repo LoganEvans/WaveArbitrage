@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <string>
 
-#include "absl/strings/str_join.h"
 #include <glog/logging.h>
 
 using std::string;
@@ -16,23 +15,26 @@ public:
     shares_.resize(symbols_.size());
   }
 
-  string to_string(int indent = 0) const {
+  string to_string(const std::vector<double> &prices, int indent = 0) const {
     string top_indent = "";
     for (int i = 0; i < indent; i++) {
-      absl::StrAppend(&top_indent, " ");
+      top_indent += " ";
     }
 
     string middle_indent = "";
     for (int i = 0; i < indent + 2; i++) {
-      absl::StrAppend(&middle_indent, " ");
+      middle_indent += " ";
     }
 
-    string s = absl::StrCat(top_indent, "Portfolio {\n", middle_indent,
-                            "cash: $", cash_, ",\n");
+    string s = top_indent + "Portfolio {\n" + middle_indent + "cash: $" +
+               std::to_string(cash_) + ",\n";
+    s += middle_indent + "value: " + std::to_string(value(prices)) + ",\n";
+    s += middle_indent + "g: " + std::to_string(g(prices)) + ",\n";
+    s += middle_indent + "stocks: {";
     for (size_t i = 0; i < symbols_.size(); i++) {
-      absl::StrAppend(&s, middle_indent, symbols_[i], ": ", shares_[i], ",\n");
+      s += symbols_[i] + ": " + std::to_string(shares_[i]) + ", ";
     }
-    absl::StrAppend(&s, top_indent, "}");
+    s += "}\n" + top_indent + "}";
     return s;
   }
 
@@ -47,12 +49,12 @@ public:
   double cash() const { return cash_; }
 
   double shares(size_t symbol_index) const {
-    CHECK_LT(symbol_index, shares_.size());
+    DCHECK_LT(symbol_index, shares_.size());
     return shares_[symbol_index];
   }
 
   double value(const std::vector<double> &prices) const {
-    CHECK_EQ(prices.size(), shares_.size());
+    DCHECK_EQ(prices.size(), shares_.size());
 
     double value = cash_;
     for (size_t i = 0; i < prices.size(); i++) {
@@ -61,17 +63,28 @@ public:
     return value;
   }
 
+  double g(const std::vector<double> &prices) const {
+    double total_value = value(prices);
+    double prod = 1.0;
+    for (auto price : prices) {
+      prod *= total_value / price;
+    }
+
+    return pow(prod, 1.0 / prices.size());
+  }
+
   void buy(size_t symbol_index, double quantity, double price) {
-    double cost = quantity * price;
+    const double real_cost = static_cast<int>(100 * quantity * price) / 100.0;
+    const double real_quantity = real_cost / price;
 
-    CHECK_LE(cost, cash_);
+    DCHECK_LE(real_cost, cash_);
 
-    cash_ -= cost;
-    shares_[symbol_index] += quantity;
+    cash_ -= real_cost;
+    shares_[symbol_index] += real_quantity;
   }
 
   void sell(size_t symbol_index, double quantity, double price) {
-    CHECK_LE(quantity, shares_[symbol_index]);
+    DCHECK_LE(quantity, shares_[symbol_index]);
 
     shares_[symbol_index] -= quantity;
     cash_ += quantity * price;

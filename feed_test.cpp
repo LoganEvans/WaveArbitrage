@@ -5,9 +5,11 @@
 #include "feed.h"
 
 using ::google::protobuf::Timestamp;
+using ::std::string;
 
 TEST(FeedTest, Random) {
-  RandomFeed feed({1.0, 1.0}, 1.0 / 252, 1.0 / 252);
+  RandomFeed feed(/*symbols=*/{"FOO", "BAR"}, {1.0, 1.0}, 1.0 / 252, 1.0 / 252,
+                  /*lifespan=*/10);
   EXPECT_EQ(feed.prices()[0], 1.0);
 
   Timestamp before = feed.timestamp();

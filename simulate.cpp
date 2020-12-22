@@ -83,16 +83,8 @@ public:
 
   virtual ~Flipper() {}
 
-  double total_shares() {
-    double total = 0.0;
-    for (size_t i = 0; i < positions_.size(); i++) {
-      total += positions_[i] * prices_[i];
-    }
-    return total;
-  }
-
   double g() {
-    double total = total_shares();
+    double total = value();
     double prod = 1.0;
     for (auto price : prices_) {
       prod *= total / price;
@@ -135,7 +127,7 @@ protected:
   virtual void rebalance() {}
 
   void adjust_prices() {
-    if (false) {
+    if (true) {
       for (size_t i = 0; i < prices_.size(); i++) {
         prices_[i] = prices_[i] + prices_[i] * (gbm_sigma_ * gbm_sqrt_dt_ *
                                                 norm_dist_(generator_));
@@ -176,7 +168,7 @@ protected:
   int rebalances_ = 0;
 
   void rebalance() override {
-    double dollars_per_stock = total_shares() / num_stocks_;
+    double dollars_per_stock = value() / num_stocks_;
     double threshold = dollars_per_stock * threshold_;
 
     bool skip_rebalance = true;
@@ -208,7 +200,7 @@ void run_experiment(int num_stocks, int flips, int num_trials, double gbm_mu,
 
   int trials_remaining = num_trials;
   // Use threshold = 1.0 to rebalance after every price adjustment.
-  double threshold = 1.05;
+  double threshold = 1.001;
   WelfordRunningStatistics bh_g_stats;
   WelfordRunningStatistics bh_val_stats;
   WelfordRunningStatistics wave_g_stats;
@@ -293,9 +285,9 @@ int main() {
   srand(time(NULL));
   setbuf(stdout, NULL);
 
-  static constexpr double sigma = 1.0 / 252;
+  static constexpr double sigma = 1.0 / 20;
   static constexpr double dt = 1.0 / 252;
 
-  run_experiment(/*num_stocks=*/2, /*flips=*/100000, /*num_trials=*/100000,
+  run_experiment(/*num_stocks=*/2, /*flips=*/100000, /*num_trials=*/1000,
                  /*gbm_mu=*/0.0, /*gbm_dt=*/dt, /*gbm_sigma=*/sigma);
 }
