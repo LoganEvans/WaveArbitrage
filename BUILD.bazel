@@ -63,6 +63,7 @@ cc_binary(
         ":feed",
         ":market_data_cc_proto",
         ":strategy",
+        ":util",
     ],
     linkopts = ["-lpthread"],
     copts = ["-std=c++17"]

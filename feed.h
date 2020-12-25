@@ -82,6 +82,9 @@ public:
       for (size_t i = 0; i < prices_.size(); i++) {
         prices_[i] = prices_[i] + prices_[i] * (gbm_sigma_ * gbm_sqrt_dt_ *
                                                 norm_dist_(generator_));
+        if (prices_[i] <= 5.0) {
+          prices_[i] = 5.01;
+        }
       }
     } else {
       for (size_t i = 0; i < prices_.size(); i++) {
@@ -92,8 +95,7 @@ public:
       }
     }
 
-    timestamp_.set_seconds(timestamp_.seconds() + 3600 +
-                           100 * norm_dist_(generator_));
+    timestamp_.set_seconds(timestamp_.seconds() + 100);
     return true;
   }
 

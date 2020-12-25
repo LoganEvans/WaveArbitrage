@@ -36,7 +36,7 @@ TEST(UtilTest, StreamInterval) {
 
   StreamIntervalStatistics si_stats(dur);
 
-  for (int i = 0; i < 1000000; i++) {
+  for (int i = 0; i < 100000; i++) {
     double val = norm_dist(generator);
     timestamp.set_seconds(timestamp.seconds() + 360 +
                           10 * norm_dist(generator));

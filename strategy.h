@@ -38,7 +38,7 @@ public:
 
   void rebalance(const std::vector<double> &prices) {
     for (size_t i = 0; i < prices.size(); i++) {
-      CHECK_GE(portfolio().shares(i), 0.0) << rebalances_;
+      DCHECK_GE(portfolio().shares(i), 0.0) << rebalances_;
       folio_.sell(i, portfolio().shares(i), prices[i]);
     }
 
