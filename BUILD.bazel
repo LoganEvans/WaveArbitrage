@@ -115,6 +115,7 @@ cc_library(
     deps = [
         ":market_data_cc_proto",
         ":portfolio",
+        ":util",
         "@com_github_google_glog//:glog",
     ],
 )

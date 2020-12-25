@@ -62,6 +62,11 @@ bool less_than(const Duration& a, const Duration& b) {
          (a.seconds() == b.seconds() && a.nanos() < b.nanos());
 }
 
+bool before(const Timestamp& a, const Timestamp& b) {
+  return a.seconds() < b.seconds() ||
+         (a.seconds() == b.seconds() && a.nanos() < b.nanos());
+}
+
 class StreamIntervalStatistics {
 public:
   StreamIntervalStatistics(const Duration &duration)
