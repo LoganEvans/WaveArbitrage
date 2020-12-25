@@ -78,7 +78,7 @@ public:
       return false;
     }
 
-    if (false) {
+    if (true) {
       for (size_t i = 0; i < prices_.size(); i++) {
         prices_[i] = prices_[i] + prices_[i] * (gbm_sigma_ * gbm_sqrt_dt_ *
                                                 norm_dist_(generator_));

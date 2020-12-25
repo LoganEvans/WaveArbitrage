@@ -8,13 +8,16 @@
 #include <string>
 #include <vector>
 
+#include "external/dynamic_histogram/cpp/DynamicHistogram.h"
 #include "feed.h"
 #include "market_data.pb.h"
 #include "strategy.h"
 
+using DynamicHistogram =
+    dhist::DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/false>;
+
 std::vector<std::string> get_iex(std::string symbol) {
-  static const std::string kProcessedDir =
-      "/home/logan/data/processed/";
+  static const std::string kProcessedDir = "/home/logan/data/processed/";
   std::string comparison = kProcessedDir + symbol;
   std::vector<std::string> res;
   for (const auto &f : std::filesystem::directory_iterator(kProcessedDir)) {
@@ -28,25 +31,30 @@ std::vector<std::string> get_iex(std::string symbol) {
   return res;
 }
 
-void job(std::unique_ptr<Feed> feed, double cash, double rebalance_threshold) {
+void job(std::unique_ptr<Feed> feed, double cash, double rebalance_threshold,
+         DynamicHistogram *bh_hist, DynamicHistogram *wave_hist) {
   BuyAndHold bh(cash, feed->symbols(), feed->prices());
-  WaveArbitrage wave(cash, feed->symbols(), feed->prices(), rebalance_threshold);
+  WaveArbitrage wave(cash, feed->symbols(), feed->prices(),
+                     rebalance_threshold);
 
   while (feed->adjust_prices()) {
     bh.price_event(feed->prices());
     wave.price_event(feed->prices());
+    bh_hist->addValue(bh.portfolio().value(feed->prices()));
+    wave_hist->addValue(wave.portfolio().value(feed->prices()));
   }
   printf("%s\n", feed->to_string().c_str());
   printf("%s\n", bh.to_string(feed->prices()).c_str());
   printf("%s\n", wave.to_string(feed->prices()).c_str());
-  printf("%lf\n", bh.portfolio().value(feed->prices()) - wave.portfolio().value(feed->prices()));
+  printf("%lf\n", bh.portfolio().value(feed->prices()) -
+                      wave.portfolio().value(feed->prices()));
   printf("\n");
 }
 
 int main() {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
-  //market_data::Events events;
-  //for (auto f : get_iex("PPL")) {
+  // market_data::Events events;
+  // for (auto f : get_iex("PPL")) {
   //  std::fstream input(f, std::ios::in | std::ios::binary);
   //  events.ParseFromIstream(&input);
   //  for (auto event : events.events()) {
@@ -62,11 +70,17 @@ int main() {
   static constexpr double dt = 1.0 / 252;
   static constexpr double sigma = 1.0 / 252;
   static constexpr double rebalance_threshold = 1.0;
+  DynamicHistogram bh_hist(/*max_num_buckets=*/31);
+  DynamicHistogram wave_hist(/*max_num_buckets=*/31);
   std::unique_ptr<Feed> feed = std::make_unique<RandomFeed>(RandomFeed(
       /*symbols=*/{"FOO", "BAR"}, /*prices=*/{10.0, 10.0},
       /*gbm_dt=*/dt, /*gbm_sigma=*/sigma, /*lifespan=*/10000000));
   job(/*feed=*/std::move(feed), /*cash=*/cash,
-      /*rebalance_threshold=*/rebalance_threshold);
+      /*rebalance_threshold=*/rebalance_threshold,
+      /*bh_hist=*/&bh_hist, /*wave_hist=*/&wave_hist);
+
+  printf("%s\n", bh_hist.json().c_str());
+  printf("%s\n", wave_hist.json().c_str());
 
   return 0;
 }

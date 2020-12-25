@@ -32,6 +32,12 @@ git_repository(
     branch = "v1.10.x",
 )
 
+git_repository(
+    name = "dynamic_histogram",
+    remote = "https://github.com/Big-Theta/DynamicHistogram",
+    branch = "master",
+)
+
 http_archive(
     name = "com_github_gflags_gflags",
     sha256 = "34af2f15cf7367513b352bdcd2493ab14ce43692d2dcd9dfc499492966c64dcf",
