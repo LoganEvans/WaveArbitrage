@@ -10,7 +10,7 @@
 using ::google::protobuf::Duration;
 using ::google::protobuf::Timestamp;
 using DynamicHistogram =
-    dhist::DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/false>;
+    dhist::DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/true>;
 
 class WelfordRunningStatistics {
 public:
