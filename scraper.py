@@ -30,6 +30,10 @@ parser.add_argument(
         default=os.path.join(FPATH, "processed"),
         help="Location for processed protos.")
 parser.add_argument(
+        "--dividends_folder", type=str,
+        default=os.path.join(FPATH, "dividends"),
+        help="Location for splits and dividends CSVs.")
+parser.add_argument(
         "--download_folder", type=str,
         default=os.path.join(FPATH, "IEX_data"),
         help="Location for PCAP data.")
@@ -96,6 +100,15 @@ SP500_2015_SET = set(SP500_2015)
 
 class BacktestException(Exception):
     pass
+
+
+def dividend_history(
+        stock, date_start=datetime(2016, 12, 11),
+        date_end=datetime.now(), limit_denominator=10000):
+    from pandas_datareader import data as web
+    df = web.DataReader(
+            stock, data_source='yahoo-actions', start=date_start, end=date_end)
+    return df
 
 
 prev_processed = set()
@@ -219,7 +232,29 @@ def download_pcap(date: datetime):
         return
 
 
+def download_splits():
+    work_mutex = os.path.join(args.work_claimed_folder, "splits_and_dividends")
+    try:
+        os.open(work_mutex, os.O_CREAT | os.O_EXCL)
+    except FileExistsError:
+        return
+
+    all_data = dividend_history(SP500_2015)
+
+    try:
+        os.mkdir(args.dividends_folder)
+    except OSError:
+        pass
+
+    for symbol, data in all_data.items():
+        with open(os.path.join(args.dividends_folder, symbol + ".csv"), 'w') as fout:
+            fout.write(data.to_csv(header=False))
+
+
 if __name__ == "__main__":
+    download_splits()
+    exit()
+
     for path in [args.processed_folder, args.download_folder,
                  args.work_claimed_folder]:
         if not os.path.exists(path):

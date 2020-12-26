@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <deque>
+#include <mutex>
 #include <google/protobuf/util/time_util.h>
 #include "external/dynamic_histogram/cpp/DynamicHistogram.h"
 
@@ -18,6 +19,8 @@ public:
       : count_(0), mean_(0.0), M2_(0.0) {}
 
   void update(double new_value) {
+    std::scoped_lock<std::mutex> lock(mu_);
+
     count_++;
     double delta = new_value - mean_;
     mean_ += delta / count_;
@@ -38,6 +41,7 @@ public:
   };
 
 private:
+  std::mutex mu_;
   int64_t count_;
   double mean_;
   double M2_;

@@ -65,15 +65,14 @@ int main() {
       /*bh_stats=*/&bh_stats, /*wave_stats=*/&wave_stats);
 
   printf("%s\n", bh_stats.hist()
-                     ->json(/*title=*/"bh",
-                            /*label=*/"mean: " +
-                                std::to_string(bh_stats.hist()->getMean()))
+                     ->json(/*title=*/"",
+                            /*label=*/"bh -- mean: " +
+                                std::to_string(bh_stats.stats().mean()))
                      .c_str());
   printf("%s\n", wave_stats.hist()
-                     ->json(
-                         /*title=*/"wave",
-                         /*label=*/"mean: " +
-                             std::to_string(wave_stats.hist()->getMean()))
+                     ->json(/*title=*/"",
+                            /*label=*/"wave -- mean: " +
+                                std::to_string(wave_stats.stats().mean()))
                      .c_str());
 
   return 0;
