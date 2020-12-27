@@ -103,8 +103,7 @@ class BacktestException(Exception):
 
 
 def dividend_history(
-        stock, date_start=datetime(2016, 12, 11),
-        date_end=datetime.now(), limit_denominator=10000):
+        stock, date_start=datetime(2016, 12, 11), date_end=datetime.now()):
     from pandas_datareader import data as web
     df = web.DataReader(
             stock, data_source='yahoo-actions', start=date_start, end=date_end)
@@ -252,7 +251,8 @@ def download_splits():
 
 
 if __name__ == "__main__":
-    download_splits()
+    #download_splits()
+    print(dividend_history("AIV"))
     exit()
 
     for path in [args.processed_folder, args.download_folder,

@@ -32,7 +32,7 @@ TEST(FeedTest, IEX) {
   feed.adjust_prices();
 
   for (int i = 0; i < 10000; i++) {
-    EXPECT_TRUE(feed.adjust_prices());
+    EXPECT_EQ(feed.adjust_prices(), Feed::FEED_OK);
   }
 }
 
