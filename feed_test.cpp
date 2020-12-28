@@ -29,11 +29,40 @@ TEST(FeedTest, Random) {
 
 TEST(FeedTest, IEX) {
   IEXFeed feed(/*symbols=*/{"GOOG", "FB"});
-  feed.adjust_prices();
 
-  for (int i = 0; i < 10000; i++) {
-    EXPECT_EQ(feed.adjust_prices(), Feed::FEED_OK);
+  FeedStatus fs = FEED_OK;
+  while (fs == FEED_OK) {
+    fs = feed.adjust_prices();
   }
+
+  EXPECT_EQ(fs, FEED_DAY_CHANGE);
+  EXPECT_EQ(feed.adjust_prices(), FEED_OK);
+}
+
+TEST(FeedTest, dividends) {
+  IEXFeed feed(/*symbols=*/{"F"});
+
+  FeedStatus fs = FEED_OK;
+  while (!(fs & FEED_END) && !(fs & FEED_DIVIDEND)) {
+    EXPECT_EQ(feed.dividends()[0], 0.0);
+    fs = feed.adjust_prices();
+  }
+
+  EXPECT_TRUE(fs & FEED_DIVIDEND);
+  EXPECT_NEAR(feed.dividends()[0], 0.2, 1e-5);
+}
+
+TEST(FeedTest, splits) {
+  IEXFeed feed(/*symbols=*/{"GE"});
+
+  FeedStatus fs = FEED_OK;
+  while (!(fs & FEED_END) && !(fs & FEED_SPLIT)) {
+    EXPECT_EQ(feed.splits()[0], 0.0);
+    fs = feed.adjust_prices();
+  }
+
+  EXPECT_TRUE(fs & FEED_SPLIT);
+  EXPECT_NEAR(feed.splits()[0], 0.9615384615384616, 1e-5);
 }
 
 int main(int argc, char **argv) {

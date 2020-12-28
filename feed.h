@@ -16,6 +16,13 @@
 using ::google::protobuf::Timestamp;
 using ::std::string;
 
+typedef int FeedStatus;
+static constexpr FeedStatus FEED_OK = 1;
+static constexpr FeedStatus FEED_DAY_CHANGE = 2;
+static constexpr FeedStatus FEED_DIVIDEND = 4;
+static constexpr FeedStatus FEED_SPLIT = 8;
+static constexpr FeedStatus FEED_END = 16;
+
 struct PriceAction {
   PriceAction(Timestamp timestamp, double ratio, bool is_dividend)
       : timestamp(timestamp), ratio(ratio), is_dividend(is_dividend) {}
@@ -67,16 +74,9 @@ struct PriceAction {
 
 class Feed {
 public:
-  enum FeedStatus {
-    FEED_OK = 0,
-    FEED_DAY_CHANGE = 1,
-    FEED_DIVIDEND = 2,
-    FEED_SPLIT = 4,
-    FEED_END = 8,
-  };
-
   Feed(std::vector<string> symbols)
-      : symbols_(symbols), prices_(symbols.size(), 0.0) {}
+      : symbols_(symbols), prices_(symbols.size(), 0.0),
+        dividends_(symbols.size(), 0.0), splits_(symbols.size(), 0.0) {}
 
   virtual ~Feed() {}
 
@@ -109,11 +109,17 @@ public:
 
   const std::vector<double> &prices() const { return prices_; }
 
+  const std::vector<double> &dividends() const { return dividends_; }
+
+  const std::vector<double> &splits() const { return splits_; }
+
   const Timestamp &timestamp() const { return timestamp_; }
 
 protected:
   std::vector<string> symbols_;
   std::vector<double> prices_;
+  std::vector<double> dividends_;
+  std::vector<double> splits_;
   Timestamp timestamp_;
 };
 
@@ -186,51 +192,43 @@ std::vector<string> get_iex(string symbol) {
 class IEXFeed : public Feed {
 public:
   IEXFeed(std::vector<string> symbols) : Feed(symbols) {
-    dividends_.resize(symbols.size());
-    splits_.resize(symbols.size());
-
-    size_t i = 0;
-    for (auto symbol : symbols) {
+    day_events_.resize(symbols.size());
+    for (size_t i = 0; i < symbols.size(); i++) {
+      const string symbol = symbols[i];
       iex_files_.push_back(get_iex(symbol));
       iex_files_idxs_.push_back(0);
       day_events_.push_back(market_data::Events());
       day_events_next_idxs_.push_back(0);
+    }
 
-      CHECK_NE(advance(i), FEED_END);
+    CHECK_NE(advance_day(), FEED_END);
+
+    for (size_t i = 0; i < symbols.size(); i++) {
       auto trade = day_events_[i].events()[day_events_next_idxs_[i]].trade();
       if (before(timestamp_, trade.timestamp())) {
         last_timestamp_ = trade.timestamp();
         timestamp_ = trade.timestamp();
       }
       prices_[i] = trade.price() / 10000.0;
+    }
 
-      string filename = "/home/logan/data/dividends/" + symbol + ".csv";
+    price_actions_.resize(symbols.size());
+    for (size_t i = 0; i < symbols.size(); i++) {
+      string filename = "/home/logan/data/dividends/" + symbols[i] + ".csv";
       std::ifstream in(filename, std::ios::in | std::ios::binary);
       if (!in.good()) {
         continue;
       }
       string csv_data{std::istreambuf_iterator<char>(in),
-                           std::istreambuf_iterator<char>()};
+                      std::istreambuf_iterator<char>()};
 
-      setbuf(stdout, 0);
       size_t idx = 0;
       while (idx < csv_data.size()) {
         size_t found_idx = csv_data.find("\n", idx);
-        auto pa = PriceAction(csv_data.substr(idx, found_idx - idx));
-
-        if (pa.is_dividend) {
-          dividends_[i].push_back(pa);
-        } else {
-          splits_[i].push_back(pa);
-        }
-
+        price_actions_[i].push_back(
+            PriceAction(csv_data.substr(idx, found_idx - idx)));
         idx = found_idx + 1;
       }
-
-      std::sort(dividends_[i].begin(), dividends_[i].end());
-      std::sort(splits_[i].begin(), splits_[i].end());
-
-      i += 1;
     }
   }
 
@@ -244,7 +242,7 @@ public:
     Timestamp champ;
     int champ_idx = 0;
 
-    for (size_t i = 0; i < symbols_.size(); i++) {
+    for (size_t i = 0; i < symbols().size(); i++) {
       auto event = day_events_[i].events()[day_events_next_idxs_[i]].trade();
 
       Timestamp chump = event.timestamp();
@@ -261,17 +259,26 @@ public:
     last_timestamp_ = timestamp_;
     timestamp_ = trade.timestamp();
 
-    FeedStatus fs = advance(champ_idx);
+    FeedStatus fs = advance_event(champ_idx);
+    if (fs == FEED_DAY_CHANGE) {
+      if (advance_day() == FEED_END) {
+        return FEED_END;
+      }
 
-    if (fs & FEED_SPLIT) {
-      // TODO(lpe): Detect if one of the split_[i] price actions is in between
-      // last_timestamp_ and timestamp_. If so, prepare a splits_ vector so that
-      // a splits() function can return the ratios. Then, pipe that through to
-      // the backtester to trigger the split.
-    }
-
-    if (fs & FEED_DIVIDEND) {
-      
+      for (size_t i = 0; i < symbols().size(); i++) {
+        for (auto price_action : price_actions_[i]) {
+          if (before(last_timestamp_, price_action.timestamp) &&
+              before(price_action.timestamp, timestamp_)) {
+            if (price_action.is_dividend) {
+              dividends_[i] = price_action.ratio;
+              fs |= FEED_DIVIDEND;
+            } else {
+              splits_[i] = price_action.ratio;
+              fs |= FEED_SPLIT;
+            }
+          }
+        }
+      }
     }
 
     return fs;
@@ -283,57 +290,69 @@ private:
   std::vector<market_data::Events> day_events_;
   std::vector<int> day_events_next_idxs_;
 
-  std::vector<std::vector<PriceAction>> dividends_;
-  std::vector<std::vector<PriceAction>> splits_;
+  std::vector<std::vector<PriceAction>> price_actions_;
 
   Timestamp last_timestamp_;
 
-  bool advance_file(size_t symbol_index) {
-    const size_t i = symbol_index;
+  FeedStatus advance_day() {
+    for (size_t i = 0; i < symbols().size(); i++) {
+      if (iex_files_idxs_[i] >= iex_files_[i].size()) {
+        return FEED_END;
+      }
 
-    if (iex_files_idxs_[i] >= iex_files_[i].size()) {
-      return false;
+      initialize_day(i);
+
+      FeedStatus fs;
+      setbuf(stdout, 0);
+      while (true) {
+        fs = advance_event(i);
+        if (fs & FEED_END) {
+          return FEED_END;
+        } else if (fs & FEED_DAY_CHANGE) {
+          initialize_day(i);
+        } else {
+          break;
+        }
+      }
+
+      if (advance_event(i) & FEED_END) {
+        return FEED_END;
+      }
+
+      auto &ts =
+          day_events_[i].events()[day_events_next_idxs_[i]].trade().timestamp();
+      if (i == 0 || before(ts, timestamp_)) {
+        timestamp_ = ts;
+      }
     }
 
-    std::fstream input(iex_files_[i][iex_files_idxs_[i]],
-                       std::ios::in | std::ios::binary);
-    day_events_next_idxs_[i] = 0;
-    iex_files_idxs_[i] += 1;
-    day_events_[i].ParseFromIstream(&input);
-
-    return true;
+    return FEED_DAY_CHANGE;
   }
 
-  bool advance_event(size_t symbol_index) {
+  FeedStatus advance_event(size_t symbol_index) {
     const size_t i = symbol_index;
 
     while (true) {
       day_events_next_idxs_[i] += 1;
 
       if (day_events_next_idxs_[i] >= day_events_[i].events().size()) {
-        return false;
+        return FEED_DAY_CHANGE;
       }
 
       const auto event = day_events_[i].events()[day_events_next_idxs_[i]];
 
       if (event.has_trade()) {
-        return true;
+        return FEED_OK;
       }
     }
   }
 
-  FeedStatus advance(size_t symbol_index) {
-    const size_t i = symbol_index;
-
-    while (true) {
-      if (advance_event(i)) {
-        return FEED_OK;
-      }
-
-      if (!advance_file(i)) {
-        return FEED_END;
-      }
-    }
+  void initialize_day(size_t i) {
+    std::fstream input(iex_files_[i][iex_files_idxs_[i]],
+                       std::ios::in | std::ios::binary);
+    day_events_next_idxs_[i] = 0;
+    iex_files_idxs_[i] += 1;
+    day_events_[i].ParseFromIstream(&input);
   }
 };
 
