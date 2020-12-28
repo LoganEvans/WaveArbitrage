@@ -17,7 +17,34 @@ void job(std::unique_ptr<Feed> feed, double cash, double rebalance_threshold,
   WaveArbitrage wave(cash, feed->symbols(), feed->prices(),
                      rebalance_threshold);
 
-  while (feed->adjust_prices()) {
+  while (true) {
+    FeedStatus fs = feed->adjust_prices();
+    //printf("%lf,%lf\n", feed->prices()[0], feed->prices()[1]);
+    if (fs & FEED_DIVIDEND) {
+      for (size_t i = 0; i < feed->dividends().size(); i++) {
+        if (feed->dividends()[i] != 0.0) {
+          printf("paying dividend: %lf on %s\n", feed->dividends()[i],
+                 feed->symbols()[i].c_str());
+          bh.pay_dividend(feed->symbols()[i], feed->dividends()[i]);
+          wave.pay_dividend(feed->symbols()[i], feed->dividends()[i]);
+        }
+      }
+    }
+    if (fs & FEED_SPLIT) {
+      for (size_t i = 0; i < feed->splits().size(); i++) {
+        if (feed->splits()[i] != 0.0) {
+          printf("split: %lf on %s\n", feed->splits()[i],
+                 feed->symbols()[i].c_str());
+          printf("old shares: %lf\n", bh.portfolio().shares(i));
+          bh.stock_split(feed->symbols()[i], 1.0 / feed->splits()[i]);
+          printf("new shares: %lf\n", bh.portfolio().shares(i));
+          wave.stock_split(feed->symbols()[i], 1.0 / feed->splits()[i]);
+        }
+      }
+    }
+    if (fs & FEED_END) {
+      break;
+    }
     bh.price_event(feed->prices());
     wave.price_event(feed->prices());
     auto timestamp = std::make_shared<Timestamp>(feed->timestamp());
@@ -52,9 +79,10 @@ int main() {
         /*gbm_dt=*/dt, /*gbm_sigma=*/sigma,
         /*lifespan=*/5 * 365 * 24 * 60 * 60));
   } else {
+    //'ABT', 'ABBV', 'ACN', 'ACE', 'ADBE', 'ADT', 'AAP', 'AES', 'AET', 'AFL',
     feed = std::make_unique<IEXFeed>(IEXFeed(
-        ///*symbols=*/{"F", "GE"}));
-        /*symbols=*/{"AMG", "NFLX"}));
+        ///*symbols=*/{"AAP", "AES"}));
+        /*symbols=*/{"F", "ZION"}));
         ///*symbols=*/{"AMZN", "WMT"}));
         ///*symbols=*/{"GOOG", "FB"}));
     printf("%s\n", feed->to_string().c_str());

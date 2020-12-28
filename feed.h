@@ -274,6 +274,8 @@ public:
               fs |= FEED_DIVIDEND;
             } else {
               splits_[i] = price_action.ratio;
+              printf("??? %s, %lf\n", price_action.to_string().c_str(),
+                     splits_[i]);
               fs |= FEED_SPLIT;
             }
           }
@@ -296,6 +298,9 @@ private:
 
   FeedStatus advance_day() {
     for (size_t i = 0; i < symbols().size(); i++) {
+      dividends_[i] = 0.0;
+      splits_[i] = 0.0;
+
       if (iex_files_idxs_[i] >= iex_files_[i].size()) {
         return FEED_END;
       }
@@ -303,7 +308,6 @@ private:
       initialize_day(i);
 
       FeedStatus fs;
-      setbuf(stdout, 0);
       while (true) {
         fs = advance_event(i);
         if (fs & FEED_END) {
@@ -313,10 +317,6 @@ private:
         } else {
           break;
         }
-      }
-
-      if (advance_event(i) & FEED_END) {
-        return FEED_END;
       }
 
       auto &ts =
