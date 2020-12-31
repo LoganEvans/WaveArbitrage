@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iostream>
 #include <random>
+#include <set>
 
 #include <glog/logging.h>
 #include <google/protobuf/util/time_util.h>
@@ -76,7 +77,8 @@ class Feed {
 public:
   Feed(std::vector<string> symbols)
       : symbols_(symbols), prices_(symbols.size(), 0.0),
-        dividends_(symbols.size(), 0.0), splits_(symbols.size(), 0.0) {}
+        dividends_(symbols.size(), 0.0), splits_(symbols.size(), 0.0),
+        adjusts_(0) {}
 
   virtual ~Feed() {}
 
@@ -92,6 +94,7 @@ public:
     }
 
     string s = top_indent + feed_name() + " {\n";
+    s += middle_indent + "adjusts: " + std::to_string(adjusts_) + ",\n";
     s += middle_indent + "time: " + std::to_string(timestamp().seconds()) +
          ",\n" + middle_indent + "prices: {";
     for (size_t i = 0; i < prices_.size(); i++) {
@@ -121,6 +124,7 @@ protected:
   std::vector<double> dividends_;
   std::vector<double> splits_;
   Timestamp timestamp_;
+  size_t adjusts_;
 };
 
 class RandomFeed : public Feed {
@@ -141,6 +145,7 @@ public:
   }
 
   FeedStatus adjust_prices() override {
+    adjusts_++;
     if (num_adjusts_++ >= lifespan_) {
       return FEED_END;
     }
@@ -187,6 +192,20 @@ std::vector<string> get_iex(string symbol) {
   }
   std::sort(res.begin(), res.end());
   return res;
+}
+
+std::vector<string> get_available_symbols() {
+  static const string kProcessedDir = "/home/logan/data/processed/";
+  std::set<string> res;
+  for (const auto &f : std::filesystem::directory_iterator(kProcessedDir)) {
+    if (!f.file_size()) {
+      continue;
+    }
+    string fname = f.path();
+    size_t symbol_start = fname.find_last_of("/") + 1;
+    res.insert(fname.substr(symbol_start, fname.find("_") - symbol_start));
+  }
+  return {res.begin(), res.end()};
 }
 
 class IEXFeed : public Feed {
@@ -239,6 +258,7 @@ public:
   }
 
   FeedStatus adjust_prices() override {
+    adjusts_++;
     Timestamp champ;
     int champ_idx = 0;
 
@@ -274,8 +294,6 @@ public:
               fs |= FEED_DIVIDEND;
             } else {
               splits_[i] = price_action.ratio;
-              printf("??? %s, %lf\n", price_action.to_string().c_str(),
-                     splits_[i]);
               fs |= FEED_SPLIT;
             }
           }

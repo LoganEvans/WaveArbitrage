@@ -74,7 +74,16 @@ bool before(const Timestamp& a, const Timestamp& b) {
 class StreamIntervalStatistics {
 public:
   StreamIntervalStatistics(const Duration &duration)
-      : interval_duration_(duration), dhist_(/*max_num_buckets=*/61) {}
+      : interval_duration_(duration), dhist_(/*max_num_buckets=*/100) {}
+
+  const WelfordRunningStatistics &stats() const { return stats_; }
+
+  DynamicHistogram* hist() { return &dhist_; }
+
+  void reset_interval() {
+    vals_.clear();
+    timestamps_.clear();
+  }
 
   void update(double val, std::shared_ptr<Timestamp> timestamp) {
     Duration duration;
@@ -103,10 +112,6 @@ public:
     vals_.push_back(val);
     timestamps_.push_back(std::move(timestamp));
   }
-
-  const WelfordRunningStatistics &stats() const { return stats_; }
-
-  DynamicHistogram* hist() { return &dhist_; }
 
 private:
   const Duration interval_duration_;

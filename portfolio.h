@@ -11,7 +11,7 @@ using std::string;
 class Portfolio {
 public:
   Portfolio(double cash, std::vector<string> symbols)
-      : cash_(cash), symbols_(symbols) {
+      : cash_(cash), fees_(0.0), symbols_(symbols) {
     shares_.resize(symbols_.size());
   }
 
@@ -29,6 +29,7 @@ public:
     string s = top_indent + "Portfolio {\n" + middle_indent + "cash: $" +
                std::to_string(cash_) + ",\n";
     s += middle_indent + "value: " + std::to_string(value(prices)) + ",\n";
+    s += middle_indent + "fees: " + std::to_string(fees_) + ",\n";
     s += middle_indent + "g: " + std::to_string(g(prices)) + ",\n";
     s += middle_indent + "stocks: {";
     for (size_t i = 0; i < symbols_.size(); i++) {
@@ -74,12 +75,14 @@ public:
   }
 
   void buy(size_t symbol_index, double quantity, double price) {
-    const double real_cost = static_cast<int>(100 * quantity * price) / 100.0;
-    const double real_quantity = real_cost / price;
+    const double fee = quantity * kFeePerShare;
+    const double cost = static_cast<int>(100 * quantity * price) / 100.0 - fee;
+    const double real_quantity = cost / price;
+    // XXX Finish the fees
 
-    DCHECK_LE(real_cost, cash_);
+    DCHECK_LE(cost, cash_);
 
-    cash_ -= real_cost;
+    cash_ -= cost;
     shares_[symbol_index] += real_quantity;
   }
 
@@ -99,7 +102,9 @@ public:
   }
 
 private:
+  static constexpr double kFeePerShare = 0.0009;
   double cash_;
+  double fees_;
 
   std::vector<string> symbols_;
   std::vector<double> shares_;
