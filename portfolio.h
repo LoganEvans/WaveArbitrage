@@ -10,6 +10,8 @@ using std::string;
 
 class Portfolio {
 public:
+  static constexpr double kFeePerShare = 0.0009;
+
   Portfolio(double cash, std::vector<string> symbols)
       : cash_(cash), fees_(0.0), symbols_(symbols) {
     shares_.resize(symbols_.size());
@@ -74,23 +76,26 @@ public:
     return pow(prod, 1.0 / prices.size());
   }
 
-  void buy(size_t symbol_index, double quantity, double price) {
-    const double fee = quantity * kFeePerShare;
-    const double cost = static_cast<int>(100 * quantity * price) / 100.0 - fee;
-    const double real_quantity = cost / price;
-    // XXX Finish the fees
+  void buy(size_t symbol_index, double cash_to_spend, double price) {
+    if (cash_to_spend > cash_) {
+      cash_to_spend = cash_;
+    }
 
-    DCHECK_LE(cost, cash_);
+    const double shares = cash_to_spend / (price + kFeePerShare);
+    const double fee = shares * kFeePerShare;
 
-    cash_ -= cost;
-    shares_[symbol_index] += real_quantity;
+    cash_ -= cash_to_spend;
+    fees_ += fee;
+    shares_[symbol_index] += shares;
   }
 
   void sell(size_t symbol_index, double quantity, double price) {
     DCHECK_LE(quantity, shares_[symbol_index]);
 
     shares_[symbol_index] -= quantity;
-    cash_ += quantity * price;
+    const double fee = quantity * kFeePerShare;
+    cash_ += quantity * price - fee;
+    fees_ += fee;
   }
 
   void pay_dividend(size_t symbol_index, double per_share) {
@@ -102,7 +107,6 @@ public:
   }
 
 private:
-  static constexpr double kFeePerShare = 0.0009;
   double cash_;
   double fees_;
 

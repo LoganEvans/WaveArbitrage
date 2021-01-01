@@ -67,8 +67,9 @@ void job(std::unique_ptr<Feed> feed, double cash, double rebalance_threshold,
   printf("\n");
 }
 
-int main() {
+int main(int argc, char **argv) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
+  google::InitGoogleLogging(argv[0]);
 
   static constexpr double cash = 100000.0;
   static constexpr double rebalance_threshold = 1.0;

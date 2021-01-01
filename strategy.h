@@ -40,15 +40,31 @@ public:
     const Portfolio &portfolio() const { return folio_; }
 
     void rebalance(const std::vector<double> &prices) {
+      // This mostly ignores fees. However, the difference between the
+      // positions should diminish as the portfolio continually rebalances.
+
+      std::vector<double> values;
+      double total = portfolio().cash();
       for (size_t i = 0; i < prices.size(); i++) {
-        DCHECK_GE(portfolio().shares(i), 0.0) << num_rebalances_;
-        folio_.sell(i, portfolio().shares(i), prices[i]);
+        double value = portfolio().shares(i) * prices[i];
+        values.push_back(value);
+        total += value;
       }
 
-      double per_stock = portfolio().cash() / prices.size();
+      const double desired = total / prices.size();
       for (size_t i = 0; i < prices.size(); i++) {
-        folio_.buy(i, per_stock / prices[i], prices[i]);
+        if (values[i] > desired) {
+          folio_.sell(i, (values[i] - desired) / prices[i], prices[i]);
+        }
+        DCHECK_GE(portfolio().shares(i), 0.0) << num_rebalances_;
       }
+
+      for (size_t i = 0; i < prices.size(); i++) {
+        if (values[i] < desired) {
+          folio_.buy(i, desired - values[i], prices[i]);
+        }
+      }
+
       num_rebalances_++;
     }
 
@@ -85,9 +101,9 @@ public:
       return false;
     }
     // Reinvest dividends.
-    double per_share = portfolio().cash() / prices.size();
+    double per_stock = portfolio().cash() / prices.size();
     for (size_t i = 0; i < prices.size(); i++) {
-      folio_.buy(i, /*quantity=*/per_share / prices[i], /*price=*/prices[i]);
+      folio_.buy(i, /*cash_to_spend=*/per_stock, /*price=*/prices[i]);
     }
     return true;
   }
