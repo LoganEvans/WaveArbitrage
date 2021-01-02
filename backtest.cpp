@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "feed.h"
@@ -11,12 +13,24 @@
 #include "strategy.h"
 #include "util.h"
 
+using DynamicHistogram =
+    dhist::DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/true>;
+
 void job(std::unique_ptr<Feed> feed, double cash, double rebalance_threshold,
-         StreamIntervalStatistics *bh_stats,
-         StreamIntervalStatistics *wave_stats) {
+         WelfordRunningStatistics *bh_stats,
+         WelfordRunningStatistics *wave_stats, DynamicHistogram *bh_hist,
+         DynamicHistogram *wave_hist) {
   BuyAndHold bh(cash, feed->symbols(), feed->prices());
   WaveArbitrage wave(cash, feed->symbols(), feed->prices(),
                      rebalance_threshold);
+
+  Duration dur;
+  dur.set_seconds(365 * 24 * 60 * 60);
+  Duration cooldown;
+  cooldown.set_seconds(60);
+
+  StreamIntervalStatistics bh_si_stats(dur, cooldown, bh_stats, bh_hist);
+  StreamIntervalStatistics wave_si_stats(dur, cooldown, wave_stats, wave_hist);
 
   while (true) {
     FeedStatus fs = feed->adjust_prices();
@@ -55,16 +69,10 @@ void job(std::unique_ptr<Feed> feed, double cash, double rebalance_threshold,
 
     bh.price_event(feed->prices());
     wave.price_event(feed->prices());
-    auto timestamp = std::make_shared<Timestamp>(feed->timestamp());
-    bh_stats->update(bh.portfolio().value(feed->prices()), timestamp);
-    wave_stats->update(wave.portfolio().value(feed->prices()), timestamp);
+    bh_si_stats.update(bh.portfolio().value(feed->prices()), feed->timestamp());
+    wave_si_stats.update(wave.portfolio().value(feed->prices()),
+                         feed->timestamp());
   }
-  printf("%s\n", feed->to_string().c_str());
-  printf("%s\n", bh.to_string(feed->prices()).c_str());
-  printf("%s\n", wave.to_string(feed->prices()).c_str());
-  printf("%lf\n", bh.portfolio().value(feed->prices()) -
-                      wave.portfolio().value(feed->prices()));
-  printf("\n");
 }
 
 int main(int argc, char **argv) {
@@ -73,10 +81,12 @@ int main(int argc, char **argv) {
 
   static constexpr double cash = 100000.0;
   static constexpr double rebalance_threshold = 1.0;
-  Duration dur;
-  dur.set_seconds(365 * 24 * 60 * 60);
-  StreamIntervalStatistics bh_stats(dur);
-  StreamIntervalStatistics wave_stats(dur);
+
+  WelfordRunningStatistics bh_stats;
+  WelfordRunningStatistics wave_stats;
+  static constexpr size_t kMaxNumBuckets = 100;
+  DynamicHistogram bh_hist(kMaxNumBuckets);
+  DynamicHistogram wave_hist(kMaxNumBuckets);
 
   if (false) {
     static constexpr double dt = 1.0 / 252;
@@ -87,7 +97,8 @@ int main(int argc, char **argv) {
         /*lifespan=*/5 * 365 * 24 * 60 * 60));
     job(/*feed=*/std::move(feed), /*cash=*/cash,
         /*rebalance_threshold=*/rebalance_threshold,
-        /*bh_stats=*/&bh_stats, /*wave_stats=*/&wave_stats);
+        /*bh_stats=*/&bh_stats, /*wave_stats=*/&wave_stats,
+        /*bh_hist=*/&bh_hist, /*wave_hist=*/&wave_hist);
   } else if (false) {
     std::unique_ptr<Feed> feed = std::make_unique<IEXFeed>(IEXFeed(
         /*symbols=*/{"AIV", "XRX"}));
@@ -97,7 +108,8 @@ int main(int argc, char **argv) {
     printf("%s\n", feed->to_string().c_str());
     job(/*feed=*/std::move(feed), /*cash=*/cash,
         /*rebalance_threshold=*/rebalance_threshold,
-        /*bh_stats=*/&bh_stats, /*wave_stats=*/&wave_stats);
+        /*bh_stats=*/&bh_stats, /*wave_stats=*/&wave_stats,
+        /*bh_hist=*/&bh_hist, /*wave_hist=*/&wave_hist);
   } else {
     std::set<std::string> split_set = {
         "AFL", "AIV",  "BF-B", "BLL", "CHK",  "CMCSA", "CNX", "CTXS",
@@ -117,47 +129,98 @@ int main(int argc, char **argv) {
 
     std::uniform_int_distribution<int> uniform_dist(0, symbols.size() - 1);
     std::default_random_engine generator;
-    for (int trial = 0; trial < 500; trial++) {
-      int i = uniform_dist(generator);
-      int j;
-      do {
-        j = uniform_dist(generator);
-      } while (j == i);
-      std::unique_ptr<Feed> feed = std::make_unique<IEXFeed>(IEXFeed(
-          /*symbols=*/{symbols[i], symbols[j]}));
-      job(/*feed=*/std::move(feed), /*cash=*/cash,
-          /*rebalance_threshold=*/rebalance_threshold,
-          /*bh_stats=*/&bh_stats, /*wave_stats=*/&wave_stats);
-      printf("%s\n",
-             bh_stats.hist()
-                 ->json(/*title=*/"",
-                        /*label=*/"bh -- mean: " +
-                            std::to_string(bh_stats.stats().mean()) + " var: " +
-                            std::to_string(bh_stats.stats().sample_variance()))
-                 .c_str());
-      printf(
-          "%d, %d, %s\n", i, j,
-          wave_stats.hist()
-              ->json(/*title=*/"",
-                     /*label=*/"wave -- mean: " +
-                         std::to_string(wave_stats.stats().mean()) + " var: " +
-                         std::to_string(wave_stats.stats().sample_variance()))
-              .c_str());
-      bh_stats.reset_interval();
-      wave_stats.reset_interval();
+
+    const auto num_cpus = std::thread::hardware_concurrency();
+    std::thread threads[num_cpus];
+    std::atomic<int> jobs_completed = 0;
+
+    std::mutex mu;
+    size_t first_stock_idx = 0;
+    size_t second_stock_idx = 0;
+    auto get_next = [&]() -> std::pair<size_t, size_t> {
+      std::scoped_lock<std::mutex> lock(mu);
+
+      if (first_stock_idx < 0) {
+        return std::make_pair(-1, -1);
+      }
+
+      second_stock_idx += 1;
+      if (second_stock_idx >= symbols.size()) {
+        first_stock_idx += 1;
+        if (first_stock_idx >= symbols.size()) {
+          first_stock_idx = -1;
+          return std::make_pair(-1, -1);
+        }
+        second_stock_idx = first_stock_idx + 1;
+      }
+      return std::make_pair(first_stock_idx, second_stock_idx);
+    };
+
+    for (int tx = 0; tx < num_cpus; tx++) {
+      threads[tx] = std::thread([&]() {
+        while (true) {
+          auto idxs = get_next();
+          if (idxs.first < 0) {
+            return;
+          }
+          size_t i = idxs.first;
+          size_t j = idxs.second;
+
+          std::unique_ptr<Feed> feed = std::make_unique<IEXFeed>(IEXFeed(
+              /*symbols=*/{symbols[i], symbols[j]}));
+          job(/*feed=*/std::move(feed), /*cash=*/cash,
+              /*rebalance_threshold=*/rebalance_threshold,
+              /*bh_stats=*/&bh_stats, /*wave_stats=*/&wave_stats,
+              /*bh_hist=*/&bh_hist, /*wave_hist=*/&wave_hist);
+
+          int completed =
+              jobs_completed.fetch_add(1, std::memory_order_acq_rel);
+
+          if (completed % 10 == 0) {
+            printf("%s\n",
+                   bh_hist
+                       .json(/*title=*/"",
+                             /*label=*/"bh -- mean: " +
+                                 std::to_string(bh_stats.mean()) + " var: " +
+                                 std::to_string(bh_stats.sample_variance()))
+                       .c_str());
+            printf("%s\n",
+                   wave_hist
+                       .json(
+                           /*title=*/"",
+                           /*label=*/"wave -- mean: " +
+                               std::to_string(wave_stats.mean()) + " var: " +
+                               std::to_string(wave_stats.sample_variance()))
+                       .c_str());
+            printf("completed: %d, symbols: %s, %s\n", completed,
+                   symbols[i].c_str(), symbols[j].c_str());
+            printf("bh: %lf, wave: %lf, delta: %lf\n\n",
+                   bh_stats.mean(), wave_stats.mean(),
+                   bh_stats.mean() - wave_stats.mean());
+          }
+        }
+      });
+    }
+
+    for (int tx = 0; tx < num_cpus; tx++) {
+      threads[tx].join();
     }
   }
 
-  printf("%s\n", bh_stats.hist()
-                     ->json(/*title=*/"",
-                            /*label=*/"bh -- mean: " +
-                                std::to_string(bh_stats.stats().mean()))
-                     .c_str());
-  printf("%s\n", wave_stats.hist()
-                     ->json(/*title=*/"",
-                            /*label=*/"wave -- mean: " +
-                                std::to_string(wave_stats.stats().mean()))
-                     .c_str());
+  printf("%s\n",
+         bh_hist
+             .json(/*title=*/"",
+                   /*label=*/"bh -- mean: " + std::to_string(bh_stats.mean()) +
+                       " var: " + std::to_string(bh_stats.sample_variance()))
+             .c_str());
+  printf(
+      "%s\n",
+      wave_hist
+          .json(
+              /*title=*/"",
+              /*label=*/"wave -- mean: " + std::to_string(wave_stats.mean()) +
+                  " var: " + std::to_string(wave_stats.sample_variance()))
+          .c_str());
 
   return 0;
 }

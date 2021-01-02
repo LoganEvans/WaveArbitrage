@@ -73,52 +73,46 @@ bool before(const Timestamp& a, const Timestamp& b) {
 
 class StreamIntervalStatistics {
 public:
-  StreamIntervalStatistics(const Duration &duration)
-      : interval_duration_(duration), dhist_(/*max_num_buckets=*/100) {}
+  StreamIntervalStatistics(const Duration &duration, const Duration &cooldown,
+                           WelfordRunningStatistics *stats,
+                           DynamicHistogram *hist)
+      : interval_duration_(duration), cooldown_(cooldown), stats_(stats),
+        hist_(hist) {}
 
-  const WelfordRunningStatistics &stats() const { return stats_; }
+  void update(double val, const Timestamp& timestamp) {
+    vals_.push_back(val);
+    timestamps_.push_back(timestamp);
 
-  DynamicHistogram* hist() { return &dhist_; }
-
-  void reset_interval() {
-    vals_.clear();
-    timestamps_.clear();
-  }
-
-  void update(double val, std::shared_ptr<Timestamp> timestamp) {
     Duration duration;
-
-    while (true) {
-      if (timestamps_.empty()) {
-        break;
-      }
-
-      get_duration(*timestamps_.front(), *timestamp, &duration);
-      if (less_than(duration, interval_duration_)) {
-        break;
-      }
-
-      timestamps_.pop_front();
-      const double old_val = vals_.front();
-      vals_.pop_front();
-      if (old_val == 0.0) {
-        continue;
-      }
-      const double stat = val / old_val;
-      stats_.update(stat);
-      dhist_.addValue(stat);
+    get_duration(timestamps_.front(), timestamp, &duration);
+    if (less_than(duration, interval_duration_)) {
+      return;
     }
 
-    vals_.push_back(val);
-    timestamps_.push_back(std::move(timestamp));
+    timestamps_.pop_front();
+    const double old_val = vals_.front();
+    vals_.pop_front();
+
+    //get_duration(last_stat_time_, timestamp, &duration);
+    //if (less_than(duration, cooldown_)) {
+    //  return;
+    //}
+
+    //last_stat_time_.set_seconds(timestamp.seconds());
+
+    const double stat = val / old_val;
+    stats_->update(stat);
+    hist_->addValue(stat);
   }
 
 private:
   const Duration interval_duration_;
-  WelfordRunningStatistics stats_;
-  DynamicHistogram dhist_;
+  const Duration cooldown_;
+  WelfordRunningStatistics *stats_;
+  DynamicHistogram* hist_;
   std::deque<double> vals_;
-  std::deque<std::shared_ptr<Timestamp>> timestamps_;
+  std::deque<Timestamp> timestamps_;
+  Timestamp last_stat_time_;
 };
 
 #endif // WAVE_ARBITRAGE_UTIL_H
