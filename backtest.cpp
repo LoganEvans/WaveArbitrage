@@ -6,6 +6,7 @@
 #include <set>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 #include "feed.h"
@@ -84,7 +85,7 @@ int main(int argc, char **argv) {
 
   WelfordRunningStatistics bh_stats;
   WelfordRunningStatistics wave_stats;
-  static constexpr size_t kMaxNumBuckets = 100;
+  static constexpr size_t kMaxNumBuckets = 200;
   DynamicHistogram bh_hist(kMaxNumBuckets);
   DynamicHistogram wave_hist(kMaxNumBuckets);
 
@@ -120,7 +121,7 @@ int main(int argc, char **argv) {
         "FTR",
     };
     std::vector<string> symbols;
-    for (auto symbol : get_available_symbols()) {
+    for (const auto &symbol : get_available_symbols()) {
       if (split_set.find(symbol) == split_set.end() &&
           blacklist_set.find(symbol) == blacklist_set.end()) {
         symbols.push_back(symbol);
@@ -137,11 +138,11 @@ int main(int argc, char **argv) {
     std::mutex mu;
     size_t first_stock_idx = 0;
     size_t second_stock_idx = 0;
-    auto get_next = [&]() -> std::pair<size_t, size_t> {
+    auto get_next = [&]() -> std::tuple<size_t, size_t, bool> {
       std::scoped_lock<std::mutex> lock(mu);
 
       if (first_stock_idx < 0) {
-        return std::make_pair(-1, -1);
+        return std::make_tuple(-1, -1, false);
       }
 
       second_stock_idx += 1;
@@ -149,22 +150,22 @@ int main(int argc, char **argv) {
         first_stock_idx += 1;
         if (first_stock_idx >= symbols.size()) {
           first_stock_idx = -1;
-          return std::make_pair(-1, -1);
+          return std::make_tuple(-1, -1, false);
         }
         second_stock_idx = first_stock_idx + 1;
       }
-      return std::make_pair(first_stock_idx, second_stock_idx);
+      return std::make_tuple(first_stock_idx, second_stock_idx, true);
     };
 
     for (int tx = 0; tx < num_cpus; tx++) {
       threads[tx] = std::thread([&]() {
         while (true) {
           auto idxs = get_next();
-          if (idxs.first < 0) {
+          if (!std::get<2>(idxs)) {
             return;
           }
-          size_t i = idxs.first;
-          size_t j = idxs.second;
+          size_t i = std::get<0>(idxs);
+          size_t j = std::get<1>(idxs);
 
           std::unique_ptr<Feed> feed = std::make_unique<IEXFeed>(IEXFeed(
               /*symbols=*/{symbols[i], symbols[j]}));
@@ -176,7 +177,7 @@ int main(int argc, char **argv) {
           int completed =
               jobs_completed.fetch_add(1, std::memory_order_acq_rel);
 
-          if (completed % 10 == 0) {
+          if (completed % 100 == 0) {
             printf("%s\n",
                    bh_hist
                        .json(/*title=*/"",

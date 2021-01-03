@@ -5,8 +5,11 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <mutex>
 #include <random>
 #include <set>
+#include <vector>
 
 #include <glog/logging.h>
 #include <google/protobuf/util/time_util.h>
@@ -181,20 +184,16 @@ private:
   std::default_random_engine generator_;
 };
 
-std::vector<string> get_iex(string symbol) {
-  static const string kProcessedDir = "/home/logan/data/processed/";
-  string comparison = kProcessedDir + symbol + "_";
-  std::vector<string> res;
-  for (const auto &f : std::filesystem::directory_iterator(kProcessedDir)) {
-    if (0 == f.path().string().compare(0, comparison.size(), comparison)) {
-      res.push_back(f.path());
-    }
-  }
-  std::sort(res.begin(), res.end());
-  return res;
-}
+const std::vector<string>& get_available_symbols() {
+  static std::vector<string> symbols;
+  static std::mutex mtx;
 
-std::vector<string> get_available_symbols() {
+  std::scoped_lock<std::mutex> lock(mtx);
+
+  if (!symbols.empty()) {
+    return symbols;
+  }
+
   static const string kProcessedDir = "/home/logan/data/processed/";
   std::set<string> res;
   for (const auto &f : std::filesystem::directory_iterator(kProcessedDir)) {
@@ -205,7 +204,39 @@ std::vector<string> get_available_symbols() {
     size_t symbol_start = fname.find_last_of("/") + 1;
     res.insert(fname.substr(symbol_start, fname.find("_") - symbol_start));
   }
-  return {res.begin(), res.end()};
+  symbols = {res.begin(), res.end()};
+  return symbols;
+}
+
+std::map<string, std::vector<string>>& get_iex_files() {
+  static const string kProcessedDir = "/home/logan/data/processed/";
+  static std::map<string, std::vector<string>> files;
+  static std::mutex mtx;
+
+  std::scoped_lock<std::mutex> lock(mtx);
+  if (!files.empty()) {
+    return files;
+  }
+
+  for (const auto& symbol : get_available_symbols()) {
+    files[symbol] = std::vector<string>();
+  }
+
+  for (const auto &f : std::filesystem::directory_iterator(kProcessedDir)) {
+    if (!f.file_size()) {
+      continue;
+    }
+    string fname = f.path();
+    size_t symbol_start = fname.find_last_of("/") + 1;
+    string symbol = fname.substr(symbol_start, fname.find("_") - symbol_start);
+    files[symbol].push_back(f.path());
+  }
+
+  for (auto & item : files) {
+    std::sort(item.second.begin(), item.second.end());
+  }
+
+  return files;
 }
 
 class IEXFeed : public Feed {
@@ -214,7 +245,7 @@ public:
     day_events_.resize(symbols.size());
     for (size_t i = 0; i < symbols.size(); i++) {
       const string symbol = symbols[i];
-      iex_files_.push_back(get_iex(symbol));
+      iex_files_.push_back(get_iex_files()[symbol]);
       iex_files_idxs_.push_back(0);
       day_events_.push_back(market_data::Events());
       day_events_next_idxs_.push_back(0);

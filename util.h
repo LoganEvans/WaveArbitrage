@@ -93,12 +93,12 @@ public:
     const double old_val = vals_.front();
     vals_.pop_front();
 
-    //get_duration(last_stat_time_, timestamp, &duration);
-    //if (less_than(duration, cooldown_)) {
-    //  return;
-    //}
+    get_duration(last_stat_time_, timestamp, &duration);
+    if (less_than(duration, cooldown_)) {
+      return;
+    }
 
-    //last_stat_time_.set_seconds(timestamp.seconds());
+    last_stat_time_.set_seconds(timestamp.seconds());
 
     const double stat = val / old_val;
     stats_->update(stat);
