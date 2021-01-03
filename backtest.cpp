@@ -17,10 +17,10 @@
 using DynamicHistogram =
     dhist::DynamicHistogram</*kUseDecay=*/false, /*kThreadsafe=*/true>;
 
-void job(std::unique_ptr<Feed> feed, double cash, double rebalance_threshold,
-         WelfordRunningStatistics *bh_stats,
-         WelfordRunningStatistics *wave_stats, DynamicHistogram *bh_hist,
-         DynamicHistogram *wave_hist) {
+std::tuple<double, double>
+job(std::unique_ptr<Feed> feed, double cash, double rebalance_threshold,
+    WelfordRunningStatistics *bh_stats, WelfordRunningStatistics *wave_stats,
+    DynamicHistogram *bh_hist, DynamicHistogram *wave_hist) {
   BuyAndHold bh(cash, feed->symbols(), feed->prices());
   WaveArbitrage wave(cash, feed->symbols(), feed->prices(),
                      rebalance_threshold);
@@ -74,6 +74,9 @@ void job(std::unique_ptr<Feed> feed, double cash, double rebalance_threshold,
     wave_si_stats.update(wave.portfolio().value(feed->prices()),
                          feed->timestamp());
   }
+
+  return std::make_tuple(bh.portfolio().value(feed->prices()),
+                         wave.portfolio().value(feed->prices()));
 }
 
 int main(int argc, char **argv) {
@@ -135,12 +138,12 @@ int main(int argc, char **argv) {
     std::thread threads[num_cpus];
     std::atomic<int> jobs_completed = 0;
 
-    std::mutex mu;
+    std::mutex indeces_mu;
     size_t first_stock_idx = 0;
-    size_t second_stock_idx = 0;
+    size_t second_stock_idx = first_stock_idx;
     bool is_running = true;
     auto get_next = [&]() -> std::tuple<size_t, size_t, bool> {
-      std::scoped_lock<std::mutex> lock(mu);
+      std::scoped_lock<std::mutex> lock(indeces_mu);
 
       if (second_stock_idx + 1 >= symbols.size()) {
         first_stock_idx += 1;
@@ -155,6 +158,16 @@ int main(int argc, char **argv) {
       return std::make_tuple(first_stock_idx, second_stock_idx, is_running);
     };
 
+    std::mutex pair_returns_mu;
+    std::map<std::tuple<string, string>, double> bh_means;
+    std::map<std::tuple<string, string>, double> wave_means;
+    auto add_mean = [&](std::tuple<string, string> s, double bh_mean,
+                        double wave_mean) {
+      std::scoped_lock<std::mutex> lock(pair_returns_mu);
+      bh_means[s] = bh_mean / cash;
+      wave_means[s] = wave_mean / cash;
+    };
+
     for (int tx = 0; tx < num_cpus; tx++) {
       threads[tx] = std::thread([&]() {
         while (true) {
@@ -167,10 +180,13 @@ int main(int argc, char **argv) {
 
           std::unique_ptr<Feed> feed = std::make_unique<IEXFeed>(IEXFeed(
               /*symbols=*/{symbols[i], symbols[j]}));
-          job(/*feed=*/std::move(feed), /*cash=*/cash,
-              /*rebalance_threshold=*/rebalance_threshold,
-              /*bh_stats=*/&bh_stats, /*wave_stats=*/&wave_stats,
-              /*bh_hist=*/&bh_hist, /*wave_hist=*/&wave_hist);
+          auto returns = job(/*feed=*/std::move(feed), /*cash=*/cash,
+                             /*rebalance_threshold=*/rebalance_threshold,
+                             /*bh_stats=*/&bh_stats, /*wave_stats=*/&wave_stats,
+                             /*bh_hist=*/&bh_hist, /*wave_hist=*/&wave_hist);
+
+          add_mean(std::make_tuple(symbols[i], symbols[j]),
+                   std::get<0>(returns), std::get<1>(returns));
 
           int completed =
               jobs_completed.fetch_add(1, std::memory_order_acq_rel);
@@ -203,6 +219,20 @@ int main(int argc, char **argv) {
 
     for (int tx = 0; tx < num_cpus; tx++) {
       threads[tx].join();
+    }
+
+    std::vector<std::tuple<double, string, string>> delta_returns;
+    for (const auto &p : bh_means) {
+      delta_returns.push_back(
+          std::make_tuple(p.second - wave_means[p.first], std::get<0>(p.first),
+                          std::get<1>(p.first)));
+    }
+    std::sort(delta_returns.begin(), delta_returns.end());
+
+    printf("delta returns:\n");
+    for (const auto &bh_return : delta_returns) {
+      printf("%4.4s, %4.4s, %lf\n", std::get<1>(bh_return).c_str(),
+             std::get<2>(bh_return).c_str(), std::get<0>(bh_return));
     }
   }
 
