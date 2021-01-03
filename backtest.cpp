@@ -138,23 +138,21 @@ int main(int argc, char **argv) {
     std::mutex mu;
     size_t first_stock_idx = 0;
     size_t second_stock_idx = 0;
+    bool is_running = true;
     auto get_next = [&]() -> std::tuple<size_t, size_t, bool> {
       std::scoped_lock<std::mutex> lock(mu);
 
-      if (first_stock_idx < 0) {
-        return std::make_tuple(-1, -1, false);
-      }
-
-      second_stock_idx += 1;
-      if (second_stock_idx >= symbols.size()) {
+      if (second_stock_idx + 1 >= symbols.size()) {
         first_stock_idx += 1;
-        if (first_stock_idx >= symbols.size()) {
-          first_stock_idx = -1;
-          return std::make_tuple(-1, -1, false);
-        }
         second_stock_idx = first_stock_idx + 1;
+
+        if (second_stock_idx >= symbols.size()) {
+          is_running = false;
+        }
+      } else {
+        second_stock_idx += 1;
       }
-      return std::make_tuple(first_stock_idx, second_stock_idx, true);
+      return std::make_tuple(first_stock_idx, second_stock_idx, is_running);
     };
 
     for (int tx = 0; tx < num_cpus; tx++) {
