@@ -121,7 +121,7 @@ int main(int argc, char **argv) {
         "HON", "HSIC", "ISRG", "LEN", "MET",  "MKC",   "NEE", "PFE",
         "PNR", "TGNA", "VAR",  "VFC", "VNO",  "XRX"};
     std::set<std::string> blacklist_set = {
-        "FTR",
+        "FTR", "GNW",
     };
     std::vector<string> symbols;
     for (const auto &symbol : get_available_symbols()) {

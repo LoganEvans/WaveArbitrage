@@ -252,8 +252,8 @@ def download_splits():
 
 if __name__ == "__main__":
     #download_splits()
-    print(dividend_history("AIV"))
-    exit()
+    #print(dividend_history("AIV"))
+    #exit()
 
     for path in [args.processed_folder, args.download_folder,
                  args.work_claimed_folder]:
@@ -267,11 +267,14 @@ if __name__ == "__main__":
     for year in range(2016, 2022):
         for month in range(1, 13):
             for day in range(1, 32):
-                date = datetime(2016, 1, 1)
                 try:
                     date = datetime(year, month, day)
                 except ValueError:
                     continue
+
+                if date >= datetime.now():
+                    break
+
                 try:
                     p.process(date)
                 except FileExistsError:
