@@ -273,7 +273,7 @@ if __name__ == "__main__":
                     continue
 
                 if date >= datetime.now():
-                    break
+                    exit()
 
                 try:
                     p.process(date)
