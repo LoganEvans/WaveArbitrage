@@ -33,6 +33,8 @@ job(std::unique_ptr<Feed> feed, double cash, double rebalance_threshold,
   StreamIntervalStatistics bh_si_stats(dur, cooldown, bh_stats, bh_hist);
   StreamIntervalStatistics wave_si_stats(dur, cooldown, wave_stats, wave_hist);
 
+  int64_t last_hist_seconds = 0;
+
   while (true) {
     FeedStatus fs = feed->adjust_prices();
 
@@ -70,9 +72,13 @@ job(std::unique_ptr<Feed> feed, double cash, double rebalance_threshold,
 
     bh.price_event(feed->prices());
     wave.price_event(feed->prices());
-    bh_si_stats.update(bh.portfolio().value(feed->prices()), feed->timestamp());
-    wave_si_stats.update(wave.portfolio().value(feed->prices()),
-                         feed->timestamp());
+
+    if (feed->timestamp().seconds() - 60 > last_hist_seconds) {
+      last_hist_seconds = feed->timestamp().seconds();
+      bh_si_stats.update(bh.portfolio().value(feed->prices()), feed->timestamp());
+      wave_si_stats.update(wave.portfolio().value(feed->prices()),
+                           feed->timestamp());
+    }
   }
 
   return std::make_tuple(bh.portfolio().value(feed->prices()),
@@ -191,7 +197,7 @@ int main(int argc, char **argv) {
           int completed =
               jobs_completed.fetch_add(1, std::memory_order_acq_rel);
 
-          if (completed % 100 == 0) {
+          if (completed % 25 == 0) {
             printf("%s\n",
                    bh_hist
                        .json(/*title=*/"",
