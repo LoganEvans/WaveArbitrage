@@ -2,6 +2,7 @@ all:
 	pdflatex -pdf paper.tex
 	bibtex paper.aux
 	pdflatex -pdf paper.tex
+	pdflatex -pdf paper.tex
 
 clean:
 	$(RM) paper.log

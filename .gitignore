@@ -12,6 +12,10 @@ backtest
 simulate
 bazel-*
 
+paper.aux
+paper.bbl
+paper.blg
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
