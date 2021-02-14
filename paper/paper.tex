@@ -18,7 +18,6 @@
 \usepackage{csquotes}
 
 
-
 \def \thetitle {Wave Arbitrage: A Disproof of the Efficient Market Hypothesis}
 \title{\thetitle}
 
@@ -43,6 +42,10 @@ pdfsubject={econ.EM, econ.TH},
 pdfauthor={Logan P.~Evans},
 pdfkeywords={Efficient Market Hypothesis, Wave Arbitrage},
 }
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}{Corollary}
+\newtheorem{lemma}{Lemma}
 
 \begin{document}
 \maketitle
@@ -85,6 +88,45 @@ a market to wobble as traders react to that news, and there will always be more
 news. According to \citet{brooks2014}, an aquaintance of J. P. Morgan once
 asked him what the market would do, to which Morgan replied, “It will
 fluctuate.”
+
+\section{Wave Arbitrage}
+Consider a scenario where a trader is fully invested in two companies and at
+time $t$ must decide the proportion of their assets invested in each share.
+
+In some situations it’s easy to determine whether a trader’s portfolio is on
+the correct side of a trade. If the trader is holding only shares of stock $i$
+and the price of that stock $p_i$ increases while $p_j$ does not increase,
+then the trader is on the correct side of the trade. However, what about
+situations where the trader is not fully invested in one stock? We use a
+geometric mean to decide whether a portfolio comes out ahead or behind on any
+individual event.
+
+Let $s_1$ represent the number of shares in security $1$. The value of the
+portfolio, using $s_1$ as the basis of measurement, is
+$s_1 + \frac{s_2 p_2}{p_1}$. However, since both $s_1$ and $s_2$ are both
+reasonable bases for measurement, we take the geometric mean of the two
+representations and obtain
+
+\begin{equation}
+\label{G_definition}
+  G = \sqrt{ \bigg( s_1 + \frac{s_2 p_2}{p_1} \bigg)
+             \bigg( s_2 + \frac{s_1 p_1}{p_2} \bigg)
+           }
+    = \frac{s_1 p_1 + s_2 p_2}{\sqrt{p_1 p_2}}
+\end{equation}
+
+Let $\alpha_i$ represent the proportion of the portfolio invested in security
+$i$. At time $t$, the prices $p_i$ are constant, so expression
+\ref{G_definition} has the property that for any $\alpha_i$, $G$ is a constant
+value. More plainly, this means that if a trader can ignore exchange fees, then
+the value of $G$ is the same both before and after each transaction.
+
+We now prove the following lemma:
+
+\begin{lemma}
+\label{lemma_1}
+a = b
+\end{lemma}
 
 \bibliographystyle{unsrtnat}
 \bibliography{references}
