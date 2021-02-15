@@ -10,6 +10,7 @@
 \usepackage{url}            % simple URL typesetting
 \usepackage{booktabs}       % professional-quality tables
 \usepackage{amsfonts}       % blackboard math symbols
+\usepackage{amsmath}
 \usepackage{nicefrac}       % compact symbols for 1/2, etc.
 \usepackage{microtype}      % microtypography
 \usepackage{graphicx}
@@ -44,8 +45,13 @@ pdfkeywords={Efficient Market Hypothesis, Wave Arbitrage},
 }
 
 \newtheorem{theorem}{Theorem}
+\renewcommand\thetheorem{\unskip}
+
 \newtheorem{corollary}{Corollary}
+\renewcommand\thecorollary{\unskip}
+
 \newtheorem{lemma}{Lemma}
+\renewcommand\thelemma{\unskip}
 
 \begin{document}
 \maketitle
@@ -85,7 +91,7 @@ price falls.
 The wave arbitrage strategy will only work if the market fluctuates. However,
 fluctuation is a defining attribute of the stock market. New information causes
 a market to wobble as traders react to that news, and there will always be more
-news. According to \citet{brooks2014}, an aquaintance of J. P. Morgan once
+news. According to \citet{brooks2014}, an acquaintance of J. P. Morgan once
 asked him what the market would do, to which Morgan replied, “It will
 fluctuate.”
 
@@ -101,32 +107,67 @@ situations where the trader is not fully invested in one stock? We use a
 geometric mean to decide whether a portfolio comes out ahead or behind on any
 individual event.
 
-Let $s_1$ represent the number of shares in security $1$. The value of the
-portfolio, using $s_1$ as the basis of measurement, is
-$s_1 + \frac{s_2 p_2}{p_1}$. However, since both $s_1$ and $s_2$ are both
+Let $s_i$ represent the number of shares in security $1$. The value of the
+portfolio, using $s_i$ as the basis of measurement, is
+$s_i + \frac{s_j p_j}{p_i}$. However, since both $s_i$ and $s_j$ are both
 reasonable bases for measurement, we take the geometric mean of the two
 representations and obtain
 
 \begin{equation}
 \label{G_definition}
-  G = \sqrt{ \bigg( s_1 + \frac{s_2 p_2}{p_1} \bigg)
-             \bigg( s_2 + \frac{s_1 p_1}{p_2} \bigg)
+  G = \sqrt{ \bigg( s_i + \frac{s_j p_j}{p_i} \bigg)
+             \bigg( s_j + \frac{s_i p_i}{p_j} \bigg)
            }
-    = \frac{s_1 p_1 + s_2 p_2}{\sqrt{p_1 p_2}}
+    = \frac{s_i p_i + s_j p_j}{\sqrt{p_i p_j}}
 \end{equation}
 
 Let $\alpha_i$ represent the proportion of the portfolio invested in security
-$i$. At time $t$, the prices $p_i$ are constant, so expression
-\ref{G_definition} has the property that for any $\alpha_i$, $G$ is a constant
-value. More plainly, this means that if a trader can ignore exchange fees, then
-the value of $G$ is the same both before and after each transaction.
+$i$. At time $t$, the prices $p_i$ are constant, so $G$ has the property that
+for any $\alpha_i$, $G$ is a constant value. More plainly, if a trader can
+ignore exchange fees, then the value of $G$ is the same both before and after
+each transaction.
 
-We now prove the following lemma:
+Outside of rebalance events, $G$ is a function of the prices $p_i$. To find the minimum, we take the derivative with respect to $p_i$:
+
+\begin{equation}
+\begin{aligned}
+  G &= \frac{s_i p_i + s_j p_j}{\sqrt{p_i p_j}} \\
+  \frac{dG}{dp_i} &= \frac{p_j (s_i p_i - s_j p_j)}{2 (p_i p_j)^{\frac{3}{2}}} \\
+\end{aligned}
+\end{equation}
+
+Assuming prices are always greater than zero, the only root is at
+\begin{equation}
+\label{eq:balance}
+  s_i p_i = s_j p_j .
+\end{equation}
+
+This represents the global minimum. This gives us the
+following:
 
 \begin{lemma}
-\label{lemma_1}
-a = b
+\label{lemma}
+  The value $G$ will monotonically increase if the only actions performed is to
+  rebalance the portfolio it so that $\alpha_i = \frac{1}{2}$.
 \end{lemma}
+
+This observation leads to the wave arbitrage algorithm. Fluctuations in the
+market will cause the value of $G$ to change, but the value will never be less
+than $G_t$, the value of $G$ after rebalancing $\alpha_i = \frac{1}{2}$ at
+time $t$. The trigger for rebalance events can be selected so that
+$G_{t+1} > G_t$ accounting for any transaction fees.
+
+If the portfolio is holding cash as one of its two assets, then
+\ref{eq:balance} simplifies to $d = s p$. This leads to
+
+\begin{corollary}
+  If price $p$ is observed at times $t$ and $t+1$, then if the only
+  transactions made to the portfolio are to rebalance cash and shares to equal
+  ratios, then the value of the portfolio will be strictly greater at time
+  $t + 1$ if at least one rebalance event has occurred.
+\end{corollary}
+
+\section{Disproof of the Efficient Market Hypothesis}
 
 \bibliographystyle{unsrtnat}
 \bibliography{references}
