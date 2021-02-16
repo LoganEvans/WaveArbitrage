@@ -31,60 +31,60 @@ public:
     s += portfolio().to_string(prices, indent + 2) + "\n";
     s += top_indent + "}";
     return s;
+  }
+
+  virtual string strategy_name() const = 0;
+
+  virtual bool price_event(const std::vector<double> &prices) = 0;
+
+  const Portfolio &portfolio() const { return folio_; }
+
+  void rebalance(const std::vector<double> &prices) {
+    // This mostly ignores fees. However, the difference between the
+    // positions should diminish as the portfolio continually rebalances.
+
+    std::vector<double> values;
+    double total = portfolio().cash();
+    for (size_t i = 0; i < prices.size(); i++) {
+      double value = portfolio().shares(i) * prices[i];
+      values.push_back(value);
+      total += value;
     }
 
-    virtual string strategy_name() const = 0;
-
-    virtual bool price_event(const std::vector<double> &prices) = 0;
-
-    const Portfolio &portfolio() const { return folio_; }
-
-    void rebalance(const std::vector<double> &prices) {
-      // This mostly ignores fees. However, the difference between the
-      // positions should diminish as the portfolio continually rebalances.
-
-      std::vector<double> values;
-      double total = portfolio().cash();
-      for (size_t i = 0; i < prices.size(); i++) {
-        double value = portfolio().shares(i) * prices[i];
-        values.push_back(value);
-        total += value;
+    const double desired = total / prices.size();
+    for (size_t i = 0; i < prices.size(); i++) {
+      if (values[i] > desired) {
+        folio_.sell(i, (values[i] - desired) / prices[i], prices[i]);
       }
+      DCHECK_GE(portfolio().shares(i), 0.0) << num_rebalances_;
+    }
 
-      const double desired = total / prices.size();
-      for (size_t i = 0; i < prices.size(); i++) {
-        if (values[i] > desired) {
-          folio_.sell(i, (values[i] - desired) / prices[i], prices[i]);
-        }
-        DCHECK_GE(portfolio().shares(i), 0.0) << num_rebalances_;
+    for (size_t i = 0; i < prices.size(); i++) {
+      if (values[i] < desired) {
+        folio_.buy(i, desired - values[i], prices[i]);
       }
-
-      for (size_t i = 0; i < prices.size(); i++) {
-        if (values[i] < desired) {
-          folio_.buy(i, desired - values[i], prices[i]);
-        }
-      }
-
-      num_rebalances_++;
     }
 
-    void pay_dividend(string symbol, double per_share) {
-      folio_.pay_dividend(portfolio().index(symbol), per_share);
-      num_dividends_ += 1;
-    }
+    num_rebalances_++;
+  }
 
-    void stock_split(string symbol, double ratio) {
-      folio_.stock_split(portfolio().index(symbol), ratio);
-      num_splits_ += 1;
-    }
+  void pay_dividend(string symbol, double per_share) {
+    folio_.pay_dividend(portfolio().index(symbol), per_share);
+    num_dividends_ += 1;
+  }
 
-  protected:
-    const double rebalance_cash_;
-    Portfolio folio_;
-    int num_rebalances_ = 0;
-    int num_dividends_ = 0;
-    int num_splits_ = 0;
-  };
+  void stock_split(string symbol, double ratio) {
+    folio_.stock_split(portfolio().index(symbol), ratio);
+    num_splits_ += 1;
+  }
+
+protected:
+  const double rebalance_cash_;
+  Portfolio folio_;
+  int num_rebalances_ = 0;
+  int num_dividends_ = 0;
+  int num_splits_ = 0;
+};
 
 class BuyAndHold : public Strategy {
 public:
@@ -149,6 +149,5 @@ public:
 protected:
   const double rebalance_threshold_;
 };
-
 
 #endif // WAVE_ARBITRAGE_STRATEGY_H
