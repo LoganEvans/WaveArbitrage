@@ -51,11 +51,11 @@ pdfkeywords={Efficient Market Hypothesis, Wave Arbitrage},
 
 \begin{abstract}
   Wave arbitrage is a trading strategy that has a higher expected return rate
-  than the buy-and-hold strategy when the market model is a martingale. This
-  is a contradiction to the efficient market hypothesis. We compare the wave
-  arbitrage and buy-and-hold strategies for SP500 stocks from late 2016 to
-  early 2021 and demonstrate that wave arbitrage produces excess returns, even
-  accounting for trading fees.
+  than the buy-and-hold strategy when a ``fair game'' dictates price
+  fluctuations. This is a contradiction to the efficient market hypothesis. We
+  compare the wave arbitrage and buy-and-hold strategies for SP500 stocks from
+  late 2016 to early 2021 and demonstrate that wave arbitrage produces excess
+  returns, even accounting for trading fees.
 \end{abstract}
 
 % keywords can be removed
@@ -64,7 +64,7 @@ pdfkeywords={Efficient Market Hypothesis, Wave Arbitrage},
 \section{Introduction}
 
 The efficient market hypothesis has been a useful way to think about markets for
-over fifty years. According to \citet{fama1970},
+over half a century. According to \citet{fama1970},
 
 \begin{displayquote}
 A market in which prices always “fully reflect” all available information is called “efficient.”
@@ -80,7 +80,8 @@ Wave arbitrage is similar to tidal power generators. As ocean waves come in
 or go out, the water turns a water wheel and generates electricity. With wave
 arbitrage, when the stock price moves up or down, the algorithm harvests some
 of the energy of that wave by selling when the price rises and buying when the
-price falls.
+price falls. The algorithm guarantees that a trader sells when prices are at a
+peak and buys when prices are at their lowest point.
 
 The wave arbitrage strategy will only work if the market fluctuates. However,
 fluctuation is a defining attribute of the stock market. New information causes
@@ -94,26 +95,25 @@ fluctuate.”
 Consider a scenario where a trader is fully invested in two companies and at
 time $t$ must decide the proportion of their assets invested in each share.
 
-In some situations it’s easy to determine whether a trader’s portfolio is on
+In some situations it is easy to determine whether a trader’s portfolio is on
 the correct side of a trade. If the trader is holding only shares of stock $i$
-and the price of that stock $p_i$ increases while $p_j$ does not increase,
-then the trader is on the correct side of the trade. However, what about
-situations where the trader is not fully invested in one stock? We use a
-geometric mean to decide whether a portfolio comes out ahead or behind on any
-individual event.
+and the price $p_i$ of that stock increases while $p_j$ does not increase, then
+the trader is on the correct side of the trade. However, what about situations
+where the trader is not fully invested in one stock? We use a geometric mean to
+decide whether a portfolio comes out ahead or behind on any individual event.
 
-Let $s_i$ represent the number of shares in security $1$. The value of the
-portfolio, using $s_i$ as the basis of measurement, is
-$s_i + \frac{s_j p_j}{p_i}$. However, since both $s_i$ and $s_j$ are both
-reasonable bases for measurement, we take the geometric mean of the two
-representations and obtain
+Let $s_i$ represent the number of shares a portfolio holds of security $i$. The
+value of the portfolio, using $s_i$ as the basis of measurement, is
+$S_i = s_i + \frac{s_j p_j}{p_i}$. However, since both $S_i$ and $S_j$ are both
+reasonable representations for the value of a portfolio, we take the geometric
+mean of the two representations and obtain
 
 \begin{equation}
 \label{eq:g_def}
   G = \sqrt{ \bigg( s_i + \frac{s_j p_j}{p_i} \bigg)
              \bigg( s_j + \frac{s_i p_i}{p_j} \bigg)
            }
-    = \frac{s_i p_i + s_j p_j}{\sqrt{p_i p_j}}
+    = \frac{s_i p_i + s_j p_j}{\sqrt{p_i p_j}}.
 \end{equation}
 
 Let $\alpha_i$ represent the proportion of the portfolio invested in security
@@ -122,7 +122,8 @@ for any $\alpha_i$, $G$ is a constant value. More plainly, if a trader can
 ignore exchange fees, then the value of $G$ is the same both before and after
 each transaction.
 
-Outside of rebalance events, $G$ is a function of the prices $p_i$. To find the minimum, we take the derivative with respect to $p_i$:
+Outside of rebalance events, $G$ is a function of the prices $p_i$ and $p_j$.
+To find the minimum, we take the derivative with respect to $p_i$:
 
 \begin{equation}
 \begin{aligned}
@@ -141,8 +142,8 @@ This represents the global minimum. This leads to
 
 \begin{lemma}
 \label{lemma}
-  The value $G$ will monotonically increase if the only actions performed is to
-  rebalance the portfolio it so that $\alpha_i = \frac{1}{2}$.
+  The sequence $\{G\}$ will monotonically increase if the only actions performed
+  is to rebalance the portfolio so that $\alpha_i = \frac{1}{2}$.
 \end{lemma}
 
 This observation is the key to the wave arbitrage algorithm. Fluctuations in the
@@ -159,13 +160,14 @@ If the portfolio is holding cash as one of its two assets, then
 \ref{eq:balance} simplifies to $d = s p$. This leads to
 
 \begin{corollary}
-  If price $p$ is observed at times $t$ and $t+1$, then if the only
-  transactions made to the portfolio are to rebalance cash and shares to equal
-  ratios, then the value of the portfolio will be strictly greater at time
-  $t + 1$ if at least one rebalance event has occurred.
+  If price $p$ is observed at times $t$ and $t+1$, and if the only
+  transactions made to a cash and single share portfolio are to rebalance cash
+  and shares to equal ratios, then the value of the portfolio will be strictly
+  greater at time $t + 1$ if at least one rebalance event has occurred.
 \end{corollary}
 
 \section{Disproof of the Efficient Market Hypothesis}
+\label{sec:disproof}
 
 \citet{fama1970} describes a test that can show that a market is
 inefficient. Fama described the total excess market value at $t+1$ as
@@ -176,7 +178,7 @@ inefficient. Fama described the total excess market value at $t+1$ as
 \end{equation}
 
 The value $\alpha_j (\Phi_t)$ represents the proportion of assets invested in
-security $j$, $r_{j,t+1}$ as the actual return at $t+1$, and
+security $j$, $r_{j,t+1}$ is the actual return at $t+1$, and
 $E(\tilde{r}_{j,t+1} | \phi_t)$ is the expected equilibrium returns given the
 available information $\Phi_t$. Using the ``fair game'' property, meaning that price movements follow a martingale, he concludes
 
@@ -190,7 +192,7 @@ available information $\Phi_t$. Using the ``fair game'' property, meaning that p
 In other words, no strategy will outperform any other strategy. Since the
 buy-and-hold strategy avoids all trading costs, it can be used as a benchmark.
 If any strategy does have a higher expected value than the buy-and-hold
-strategy, the market is not efficient.
+strategy, the market is inefficient.
 
 While \citet{fama1970} put this forward as a test that can determine if a
 market is inefficient, he also provided this warning:
@@ -210,15 +212,15 @@ market is inefficient, he also provided this warning:
 \end{displayquote}
 
 In other words, without tying the efficient market hypothesis to an assumption
-about exected value, the hypothesis is little more than a tautology.
+about expected value, the hypothesis is little more than a tautology.
 
-Since Lemma \ref{lemma} implies that ${G}$ monotonically increases under wave
+Since Lemma \ref{lemma} implies that $\{G\}$ monotonically increases under wave
 arbitrage, the goal is to determine whether the expected value of the portfolio
 also increases.
 
 Inspecting the expected value of wave arbitrage, we let
-$S_i = s_i + \frac{s_j p_j}{p_i}$ represent the portential number of shares of
-securiy $i$ that a portfolio can produce if all shares of security $j$ are sold
+$S_i = s_i + \frac{s_j p_j}{p_i}$ represent the potential number of shares of
+security $i$ that a portfolio can produce if all shares of security $j$ are sold
 and the proceeds are used to buy shares of security $i$. Since \ref{eq:g_def}
 is the geometric mean of two quantities, we can use the inequality of
 arithmetic and geometric means to write
@@ -227,10 +229,10 @@ arithmetic and geometric means to write
   G = \sqrt{S_i S_j} \leq \frac{S_i + S_j}{2}.
 \end{equation}
 
-When using wave arbitrage, the sequence ${G}$ grows monotonically and diverges
-due to Lemma \ref{lemma}, so the arithmetic mean of $S_i$ and $S_j$ will also
-diverge. From this we conclude that the expected number of potential shares
-increases:
+When using wave arbitrage, since the sequence $\{G\}$ grows monotonically and
+diverges due to Lemma \ref{lemma}, the arithmetic mean of $S_i$ and $S_j$ will
+also diverge. From this we conclude that the expected number of potential
+shares increases:
 
 \begin{equation}
   E(S_{i,t+1}) > E(S_{i,t}).
@@ -251,19 +253,19 @@ p_{j,t}$, then
 
 Therefore, the expected return rate for wave arbitrage is higher than the
 expected return rate for buy-and-hold and Equation \ref{eq:excess_returns} is
-false.
+false. ``Fair game'' markets are inefficient.
 
 \section{Empirical Observation}
 
 The effect size of wave arbitrage is small but observable. The \citet{IEX}
 dataset provides a record of all transactions on the Investors Exchange since
 late 2016. Using this dataset, we created a simulation that modeled both the
-buy-and-hold algorithm and wave arbitrage. The exchange charges a fee of
+buy-and-hold and wave arbitrage algorithms. The exchange charges a fee of
 \$0.0009 per share traded. The simulation selects two assets and generates a
-buy-and-hold portfolio and a wave arbitrage portfolio. It attempts to rebalance
-the wave arbitrage portfolio after every public transaction. The portfolio
-values at each time $t$ are recorded, and after a period of one year the return
-is stored in a histogram.
+buy-and-hold portfolio and a wave arbitrage portfolio and then attempts to
+rebalance the wave arbitrage portfolio after every transaction in the back
+test. The portfolio values at each time $t$ are recorded, and after a period of
+one year the return is stored in a histogram.
 
 \begin{figure}[h!]
   \includegraphics[width=\linewidth]{OneYearReturnRates.png}
@@ -272,16 +274,57 @@ is stored in a histogram.
 \end{figure}
 
 This simulation uses 438 stocks listed on the SP500. It avoids any SP500 stock
-that had a split or reverse split and any stock that stopped trading during the
-four year span. Dividends are applied and reinvested during the backtest. This
-simulation does not make any attempts to avoid slippage effects, so we
-encourage researchers with more sophistocated backtest frameworks to verify
+that had a split or reverse split, as well as any stock that stopped trading
+during the four year span. Dividends are reinvested.
+
+This simulation does not make any attempts to avoid slippage effects, so we
+encourage researchers with more sophisticated back test frameworks to verify
 these results.
 
-Each pair of assets was modeled and over 13 billion datapoints for one year
+Each pair of assets was modeled and over 26 billion data points for one year
 returns were collected into the histograms in Figure \ref{fig}. The final
 result is that wave arbitrage outperformed the buy-and-hold strategy by an
 average of $0.75\%$.
+
+\section{Conclusions}
+
+In order to reach the conclusions in Section \ref{sec:disproof}, we made the following assumptions:
+
+\begin{itemize}
+  \item Price movements are a ``fair game'' and follow a martingale.
+  \item Prices fluctuate with respect to each other.
+  \item Prices do not go to zero.
+  \item The efficient market hypothesis can be stated in terms of expected
+        returns.
+\end{itemize}
+
+When prices follow a sub martingale, the disproof of Section \ref{sec:disproof}
+no longer works. Simulations for the sub martingale generated by using a fair coin and taking
+
+\begin{equation}
+  p_{t+1} =
+    \begin{cases}
+      k p_t         & \mbox{if heads,} \\
+      \frac{p_t}{k} & \mbox{if tails,}
+    \end{cases}
+\end{equation}
+
+suggest that the expected values for wave arbitrage and the buy-and-hold are
+equal. However, the variance of results for wave arbitrage is substantially
+lower than those of buy-and-hold.
+
+The assumption that prices do not go to zero is debatable since companies go
+bankrupt every year. When the prices for an asset do go to zero, the value of a
+portfolio managed by wave arbitrage also go to zero. Additional rules should be
+developed to deal with this scenario. It is not clear whether the assumption
+that prices do not go to zero poses any serious challenge to the disproof in
+Section \ref{sec:disproof}.
+
+It is unclear what might happen if a substantial portion of a market is
+governed by wave arbitrage. Perhaps markets would become less volatile.
+However, since the efficient market hypothesis is false, it is also possible
+that other algorithms would be able to take advantage of the wave arbitrage
+algorithm.
 
 \bibliographystyle{unsrtnat}
 \bibliography{references}
