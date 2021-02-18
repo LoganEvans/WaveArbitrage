@@ -194,7 +194,8 @@ const std::vector<string>& get_available_symbols() {
     return symbols;
   }
 
-  static const string kProcessedDir = "/home/logan/data/processed/";
+  static const string kProcessedDir =
+      string(getenv("HOME")) + "/iex_data/processed/";
   std::set<string> res;
   for (const auto &f : std::filesystem::directory_iterator(kProcessedDir)) {
     if (!f.file_size()) {
@@ -202,14 +203,16 @@ const std::vector<string>& get_available_symbols() {
     }
     string fname = f.path();
     size_t symbol_start = fname.find_last_of("/") + 1;
-    res.insert(fname.substr(symbol_start, fname.find("_") - symbol_start));
+    res.insert(
+        fname.substr(symbol_start, fname.find_last_of("_") - symbol_start));
   }
   symbols = {res.begin(), res.end()};
   return symbols;
 }
 
 std::map<string, std::vector<string>>& get_iex_files() {
-  static const string kProcessedDir = "/home/logan/data/processed/";
+  static const string kProcessedDir =
+      string(getenv("HOME")) + "/iex_data/processed/";
   static std::map<string, std::vector<string>> files;
   static std::mutex mtx;
 
@@ -228,7 +231,8 @@ std::map<string, std::vector<string>>& get_iex_files() {
     }
     string fname = f.path();
     size_t symbol_start = fname.find_last_of("/") + 1;
-    string symbol = fname.substr(symbol_start, fname.find("_") - symbol_start);
+    string symbol =
+        fname.substr(symbol_start, fname.find_last_of("_") - symbol_start);
     files[symbol].push_back(f.path());
   }
 
@@ -264,7 +268,8 @@ public:
 
     price_actions_.resize(symbols.size());
     for (size_t i = 0; i < symbols.size(); i++) {
-      string filename = "/home/logan/data/dividends/" + symbols[i] + ".csv";
+      string filename =
+          string(getenv("HOME")) + "/iex_data/dividends/" + symbols[i] + ".csv";
       std::ifstream in(filename, std::ios::in | std::ios::binary);
       if (!in.good()) {
         continue;

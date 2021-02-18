@@ -22,7 +22,7 @@ def debug(f):
     return spilled_milk
 
 
-FPATH = "/home/logan/data"
+FPATH = os.getenv("HOME") + "/iex_data"
 
 parser = argparse.ArgumentParser(description="Parse historical data")
 parser.add_argument(
