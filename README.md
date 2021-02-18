@@ -9,7 +9,7 @@ fluctuate. This algorithm is a disproof of the efficient market hypothesis.
 ## Paper
 
 The current version of the paper is at
-[paper/paper.pdf]{https://github.com/LoganEvans/WaveArbitrage/blob/master/paper/paper.pdf}.
+[paper/paper.pdf](https://github.com/LoganEvans/WaveArbitrage/blob/master/paper/paper.pdf).
 
 ## Environment
 
