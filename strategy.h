@@ -124,16 +124,23 @@ public:
 
   bool price_event(const std::vector<double> &prices) {
     bool do_rebalance = false;
+    std::vector<double> rebalance_prices = prices;
     // Handle dividend events.
     if (portfolio().cash() > rebalance_cash_) {
       do_rebalance = true;
     }
 
     for (size_t i = 0; i < prices.size(); i++) {
+      // This should help avoid slippage. Since the last price event, only one
+      // of the prices will have changed (generally speaking). This models
+      // putting in a limit order. On the past price event, we calculated the
+      // thresholds, and we will use those thresholds for the rebalance.
       if (prices[i] < rebalance_down_[i]) {
         do_rebalance = true;
+        rebalance_prices[i] = rebalance_down_[i] + 0.01;
       } else if (prices[i] > rebalance_up_[i]) {
         do_rebalance = true;
+        rebalance_prices[i] = rebalance_up_[i] - 0.01;
       }
     }
 
@@ -143,8 +150,13 @@ public:
     double total = values[0] + values[1];
 
     for (size_t i = 0; i < prices.size(); i++) {
-      rebalance_down_[i] = (total / 2.0) / rebalance_threshold_ / portfolio().shares(i) - 0.01;
-      rebalance_up_[i] = (total / 2.0) * rebalance_threshold_ / portfolio().shares(i) + 0.01;
+      // Set the threshold a penny away to model situations where some limit
+      // orders put in at a certain price might have executed, but ours might
+      // be at the bottom of the pile.
+      rebalance_down_[i] =
+          (total / 2.0) / rebalance_threshold_ / portfolio().shares(i) - 0.01;
+      rebalance_up_[i] =
+          (total / 2.0) * rebalance_threshold_ / portfolio().shares(i) + 0.01;
     }
 
     if (do_rebalance) {
