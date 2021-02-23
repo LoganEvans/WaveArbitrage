@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
 
   static constexpr double cash = 100000.0;
-  static constexpr double rebalance_threshold = 1.0;
+  static constexpr double rebalance_threshold = 1.001;
 
   WelfordRunningStatistics bh_stats;
   WelfordRunningStatistics wave_stats;

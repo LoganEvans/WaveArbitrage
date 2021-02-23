@@ -115,39 +115,50 @@ public:
                 const std::vector<double> &prices, double rebalance_threshold)
       : Strategy(cash, std::move(symbols)),
         rebalance_threshold_(rebalance_threshold) {
+    rebalance_down_.resize(2);
+    rebalance_up_.resize(2);
     rebalance(prices);
   }
 
   string strategy_name() const { return "WaveArbitrage"; }
 
   bool price_event(const std::vector<double> &prices) {
+    bool do_rebalance = false;
+    // Handle dividend events.
     if (portfolio().cash() > rebalance_cash_) {
+      do_rebalance = true;
+    }
+
+    for (size_t i = 0; i < prices.size(); i++) {
+      if (prices[i] < rebalance_down_[i]) {
+        do_rebalance = true;
+      } else if (prices[i] > rebalance_up_[i]) {
+        do_rebalance = true;
+      }
+    }
+
+    // TODO(lpe): Assuming 2 asset types here.
+    std::vector<double> values = {portfolio().shares(0) * prices[0],
+                                  portfolio().shares(1) * prices[1]};
+    double total = values[0] + values[1];
+
+    for (size_t i = 0; i < prices.size(); i++) {
+      rebalance_down_[i] = (total / 2.0) / rebalance_threshold_ / portfolio().shares(i) - 0.01;
+      rebalance_up_[i] = (total / 2.0) * rebalance_threshold_ / portfolio().shares(i) + 0.01;
+    }
+
+    if (do_rebalance) {
       rebalance(prices);
-      return true;
     }
 
-    const double shares0 = portfolio().shares(0);
-    double min_value = shares0 * prices[0];
-    double max_value = shares0 * prices[0];
-    for (size_t i = 1; i < prices.size(); i++) {
-      double value = portfolio().shares(i) * prices[i];
-      if (value < min_value) {
-        min_value = value;
-      }
-      if (value > min_value) {
-        max_value = value;
-      }
-      if (max_value / min_value > rebalance_threshold_) {
-        rebalance(prices);
-        return true;
-      }
-    }
-
-    return false;
+    return do_rebalance;;
   }
 
 protected:
   const double rebalance_threshold_;
+
+  std::vector<double> rebalance_down_;
+  std::vector<double> rebalance_up_;
 };
 
 #endif // WAVE_ARBITRAGE_STRATEGY_H
