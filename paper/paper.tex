@@ -67,7 +67,8 @@ The efficient market hypothesis has been a useful way to think about markets for
 over half a century. According to \citet{fama1970},
 
 \begin{displayquote}
-A market in which prices always “fully reflect” all available information is called “efficient.”
+A market in which prices always “fully reflect” all available information is
+called “efficient.”
 \end{displayquote}
 
 There are several tests that can show that a market is inefficient.
@@ -96,11 +97,12 @@ Consider a scenario where a trader is fully invested in two companies and at
 time $t$ must decide the proportion of their assets invested in each share.
 
 In some situations it is easy to determine whether a trader’s portfolio is on
-the correct side of a trade. If the trader is holding only shares of stock $i$
-and the price $p_i$ of that stock increases while $p_j$ does not increase, then
-the trader is on the correct side of the trade. However, what about situations
-where the trader is not fully invested in one stock? We use a geometric mean to
-decide whether a portfolio comes out ahead or behind on any individual event.
+the correct side of a trade. If the trader is holding only shares of security
+$i$ and the price $p_i$ of that security increases while $p_j$ does not
+increase, then the trader is on the correct side of the trade. However, what
+about situations where the trader is not fully invested in one security? We use
+a geometric mean to decide whether a portfolio comes out ahead or behind on any
+individual event.
 
 Let $s_i$ represent the number of shares a portfolio holds of security $i$. The
 value of the portfolio, using $s_i$ as the basis of measurement, is
@@ -180,7 +182,8 @@ inefficient. Fama described the total excess market value at $t+1$ as
 The value $\alpha_j (\Phi_t)$ represents the proportion of assets invested in
 security $j$, $r_{j,t+1}$ is the actual return at $t+1$, and
 $E(\tilde{r}_{j,t+1} | \phi_t)$ is the expected equilibrium returns given the
-available information $\Phi_t$. Using the ``fair game'' property, meaning that price movements follow a martingale, he concludes
+available information $\Phi_t$. Using the ``fair game'' property, meaning that
+price movements follow a martingale, he concludes
 
 \begin{equation}
 \label{eq:excess_returns}
@@ -255,6 +258,16 @@ Therefore, the expected return rate for wave arbitrage is higher than the
 expected return rate for buy-and-hold and Equation \ref{eq:excess_returns} is
 false. ``Fair game'' markets are inefficient.
 
+In order to reach this conclusion we made the following assumptions:
+
+\begin{itemize}
+  \item Price movements are a ``fair game'' and follow a martingale.
+  \item Prices fluctuate with respect to each other.
+  \item Prices do not go to zero.
+  \item The efficient market hypothesis can be stated in terms of expected
+        returns.
+\end{itemize}
+
 \section{Empirical Observation}
 
 The effect size of wave arbitrage is small but observable. The \citet{IEX}
@@ -277,29 +290,31 @@ This simulation uses 438 stocks listed on the SP500. It avoids any SP500 stock
 that had a split or reverse split, as well as any stock that stopped trading
 during the four year span. Dividends are reinvested.
 
-This simulation does not make any attempts to avoid slippage effects, so we
-encourage researchers with more sophisticated back test frameworks to verify
-these results.
+This simulation partially addresses slippage effects. At any moment, the
+algorithm calculates the price change required to make the value of one of its
+holdings exceed the value of the other holding by a ratio of $1.001$. When an
+observed price exceeds this value by more than $\$0.01$, the simulation assumes
+that a pair of rebalance transactions occurred, but it uses the pre-calculated
+prices instead of the observed prices. This models placing a limit order for
+the asset whose price fluctuated and a market order for the asset whose price
+stayed stationary. We encourage researchers with more sophisticated back test
+frameworks to verify these results.
 
-Each pair of assets was modeled and over 26 billion data points for one year
-returns were collected into the histograms in Figure \ref{fig}. The final
-result is that wave arbitrage outperformed the buy-and-hold strategy by an
-average of $0.75\%$.
+Each pair of assets was modeled. Every minute the value of the portfolio was
+stored in a buffer. After every transaction, the simulation checked the buffer
+for the value of the portfolio a year prior and then stored that return ratio
+over that one year period in a histogram. This approach collects all one-year
+return rates for all pairs of assets over the four year data period. This
+amounts to over 26 billion data points.
+
+The results are displayed in Figure \ref{fig}. The final result is that wave
+arbitrage outperformed the buy-and-hold strategy by an average of $0.74\%$.
 
 \section{Conclusions}
 
-In order to reach the conclusions in Section \ref{sec:disproof}, we made the following assumptions:
-
-\begin{itemize}
-  \item Price movements are a ``fair game'' and follow a martingale.
-  \item Prices fluctuate with respect to each other.
-  \item Prices do not go to zero.
-  \item The efficient market hypothesis can be stated in terms of expected
-        returns.
-\end{itemize}
-
 When prices follow a sub martingale, the disproof of Section \ref{sec:disproof}
-no longer works. Simulations for the sub martingale generated by using a fair coin and taking
+no longer works. Simulations for the sub martingale generated by using a fair
+coin and taking
 
 \begin{equation}
   p_{t+1} =
