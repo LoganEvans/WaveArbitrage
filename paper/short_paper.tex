@@ -1,0 +1,167 @@
+\documentclass[10pt]{article}
+
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{amsmath}
+\usepackage[margin=0.25in]{geometry}
+\usepackage{multicol}
+\usepackage{xfrac}          % compact symbols for 1/2, etc.
+\usepackage{natbib}
+
+\def \thetitle {Martingale Markets are Inefficient}
+\title{\thetitle}
+
+\author{Logan P.~Evans \texttt{(loganpevans@gmail.com)}}
+
+\date{}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}{Corollary}
+\newtheorem{lemma}{Lemma}
+
+\begin{document}
+\begin{multicols}{2}
+\maketitle
+
+\begin{abstract}
+  \noindent
+  We present the $G$-score for a portfolio and develop a trading strategy for
+  which this value monotonically increases. We show that the expected value of
+  this algorithm has a higher expected value than a buy-and-hold strategy,
+  which is a contradiction to the Efficient Market Hypothesis.
+\end{abstract}
+
+\section{Introduction}
+
+The Efficient Market Hypothesis (EMH) has been a useful way to think about
+markets for over half a century. According to \citet{fama1970}, ``A market in
+which prices always “fully reflect” all available information is called
+`efficient'.''
+
+\section{Wave Arbitrage}
+
+Consider a scenario where a trader is fully invested in two equities and at
+time $t$ must decide the proportion of their assets invested in each company.
+Let $s_i$ represent the number of shares a portfolio holds of security $i$. The
+value of the portfolio, using $s_i$ as the basis of measurement, is $S_i = s_i
++ \frac{s_j p_j}{p_i}$. However, since both $S_i$ and $S_j$ are both
+representations for the value of a portfolio, we take the geometric mean of the
+two and obtain the $G$-score:
+
+\begin{equation}
+\label{eq:g_def}
+  G = \sqrt{ \bigg( s_i + \frac{s_j p_j}{p_i} \bigg)
+             \bigg( s_j + \frac{s_i p_i}{p_j} \bigg)
+           }
+    = \frac{s_i p_i + s_j p_j}{\sqrt{p_i p_j}}.
+\end{equation}
+
+Let $\alpha_i$ represent the proportion of the portfolio invested in security
+$i$. At time $t$, the prices $p_i$ are constant, so $G$ has the property that
+for any $\alpha_i$, $G$ is a constant value. More plainly, if a trader can
+ignore exchange fees, then the value of $G$ is the same both before and after
+any trade.
+
+Outside of rebalance events, $G$ is a function of the prices $p_i$ and $p_j$.
+To find the minimum, we take the derivative with respect to $p_i$:
+
+\begin{equation}
+\begin{aligned}
+\label{def:G}
+  G &= \frac{s_i p_i + s_j p_j}{\sqrt{p_i p_j}} \\
+  \frac{dG}{dp_i} &= \frac{p_j (s_i p_i - s_j p_j)}{2 (p_i p_j)^{\frac{3}{2}}} \\
+\end{aligned}
+\end{equation}
+
+Assuming prices are always greater than zero, the only root is at
+\begin{equation}
+\label{eq:balance}
+  s_i p_i = s_j p_j .
+\end{equation}
+
+This represents the global minimum. This leads to
+
+\begin{lemma}
+\label{lemma}
+  The sequence $\{G\}$ will monotonically increase if the only actions performed
+  is to rebalance the portfolio so that $\alpha_i = \frac{1}{2}$.
+\end{lemma}
+
+We refer to this algorithm as ``wave arbitrage'' because it works by harvesting
+energy from waves in stock prices.
+
+\section{Disproof of the EMH}
+\label{sec:disproof}
+
+\citet{fama1970} describes a test that can show that a market is inefficient.
+The total excess market value at $t+1$ is
+
+\begin{equation}
+  V_{t+1}
+    = \sum_{j=1}^n \alpha_j (\Phi_t) [ r_{j,t+1} - E(\tilde{r}_{j,t+1} | \Phi_t)].
+\end{equation}
+
+The value $\alpha_j (\Phi_t)$ represents the proportion of assets invested in
+security $j$, $r_{j,t+1}$ is the actual return at $t+1$, and
+$E(\tilde{r}_{j,t+1} | \phi_t)$ is the expected equilibrium returns given the
+available information $\Phi_t$. Using the ``fair game'' property, meaning that
+price movements follow a martingale, he concludes
+
+\begin{equation}
+\label{eq:excess_returns}
+  E(\tilde{V}_{t+1} | \Phi_t)
+    = \sum_{j=1}^n \alpha_j (\Phi_t) E(\tilde{z}_{j,t+1} | \Phi_t)
+    = 0.
+\end{equation}
+
+In other words, no strategy will outperform any other strategy. Since the
+buy-and-hold strategy avoids all trading costs, it can be used as a benchmark.
+
+Since Lemma \ref{lemma} implies that $\{G\}$ monotonically increases under wave
+arbitrage, the goal is to determine whether the expected value of the portfolio
+also increases.
+
+Inspecting the expected value of wave arbitrage, we let
+$S_i = s_i + \frac{s_j p_j}{p_i}$ represent the potential number of shares of
+security $i$ that a portfolio can produce if all shares of security $j$ are sold
+and the proceeds are used to buy shares of security $i$. Since $G$ is the
+geometric mean of two quantities, we can use the inequality of arithmetic and
+geometric means to write
+
+\begin{equation}
+  G = \sqrt{S_i S_j} \leq \frac{S_i + S_j}{2}.
+\end{equation}
+
+When using wave arbitrage, since the sequence $\{G\}$ grows monotonically and
+diverges due to Lemma \ref{lemma}, the arithmetic mean of $S_i$ and $S_j$ will
+also diverge. From this we conclude that the expected number of potential
+shares increases:
+
+\begin{equation}
+  E(S_{i,t+1}) > E(S_{i,t}).
+\end{equation}
+
+Under the buy-and-hold strategy, the number of shares held does not change, but
+$S_i$ is a function of the prices and can change. However, the expected returns
+from security $i$ is equal to the expected returns from security $j$; if that
+were not the case, an investor could allocate all of their assets to one or the
+other of the securities and have an abnormally high expected return. This
+implies that the expected price change $\delta$ is equal for the two assets.
+However, if $E (p_{i,t+1}) = \delta p_{i,t}$ and $E (p_{j,t+1}) = \delta
+p_{j,t}$, then
+
+\begin{equation}
+  E(S_{i,t+1}) = s_i + \frac{s_j (\delta p_{j,t})}{\delta p_{i,t}} = E (S_{i}).
+\end{equation}
+
+Therefore, the expected return rate for wave arbitrage is higher than the
+expected return rate for buy-and-hold and Equation \ref{eq:excess_returns} is
+false.
+
+\section{Conclusion}
+Martingale markets are inefficient.
+
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+
+\end{multicols}
+\end{document}
